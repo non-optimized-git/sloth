@@ -40,8 +40,8 @@
   --c-bg:#1a1816;--c-card:#242220;--c-border:#3a3632;
   --c-brown:#d4c4b0;--c-brown-m:#a89880;--c-brown-l:#6b5d50;
   --c-beige:#3a3632;--c-beige-l:#2e2b28;
-  --c-green:#7a9a6a;--c-green-l:#2a2e26;--c-green-ll:#333a2e;
-  --c-red:#d4736a;--c-red-l:#3a2826;
+  --c-green:#7a9a6a;--c-green-l:#1a2e1a;--c-green-ll:#2a3a2a;
+  --c-red:#d4736a;--c-red-l:#2e1a1a;
   --c-amber:#c4a06a;--c-amber-l:#332e26;
   --c-teal:#6aaa9a;--c-teal-l:#263030;
   --t1:#e8ddd0;--t2:#a89880;--t3:#6b5d50;
@@ -77,6 +77,12 @@ body{
 .upload-area .hint{font-size:var(--f-xs);color:var(--t3);margin-top:3px}
 .upload-area input{display:none}
 .upload-footer{margin-top:14px;font-size:var(--f-xs);color:var(--t3);display:flex;align-items:center;gap:4px;justify-content:center;opacity:.6}
+
+/* ── 搜索框 ─────────────────────────────── */
+.search-box{padding:8px 10px 4px}
+.search-box input{width:100%;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-s);background:var(--c-card);color:var(--t1);font-size:var(--f-sm);outline:none;transition:all .2s}
+.search-box input:focus{border-color:var(--c-green);box-shadow:0 0 0 2px var(--c-green-l)}
+.search-box input::placeholder{color:var(--t3)}
 
 /* ── 顶部 Banner ──────────────────── */
 .header{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--c-card);border-bottom:1px solid var(--c-border);height:var(--header-h);display:flex;align-items:center;padding:0 12px;transition:background-color .4s ease,border-color .4s ease}
@@ -149,7 +155,7 @@ body{
 
 /* ── 多列图表 ──────────────────────── */
 .chart-columns{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px}
-.chart-col{min-width:220px;flex:1}
+.chart-col{flex:1;min-width:0}
 .col-header{font-size:var(--f-xs);font-weight:600;color:var(--c-brown);padding:3px 6px;background:transparent;text-align:center;border:1px solid transparent;border-bottom:none;border-radius:var(--radius-s) var(--radius-s) 0 0}
 .col-header.total-col{background:transparent;color:var(--c-brown);border-color:transparent}
 .col-base{font-weight:400;color:var(--t3);font-size:7px}
@@ -280,6 +286,9 @@ body{
   </div>
   <div class="container">
     <nav class="sidebar" id="sidebar">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="🔍 搜索题目..." autocomplete="off">
+      </div>
       <div class="add-group-btn" id="addGroupBtn">＋ 添加分组</div>
     </nav>
     <div class="sidebar-resizer" id="sidebarResizer"></div>
@@ -294,17 +303,17 @@ body{
         <div class="seg" data-mode="count">数值</div>
         <div class="seg" data-mode="both">两者</div>
       </div>
-      <div class="tb-label" style="margin-top:6px">小数位数</div>
+      <div class="tb-label" style="margin-top:12px">小数位数</div>
       <div class="segmented" id="decimalOptions">
         <div class="seg" data-decimal="2">2位</div>
         <div class="seg" data-decimal="1">1位</div>
         <div class="seg active" data-decimal="0">整数</div>
       </div>
-      <div class="toggle-row" id="diffToggle">
+      <div class="toggle-row" id="diffToggle" style="margin-top:12px">
         <span class="tl">显示差异</span>
         <div class="toggle"><div class="knob"></div></div>
       </div>
-      <div class="tb-label" style="margin-top:6px">柱体粗细</div>
+      <div class="tb-label" style="margin-top:12px">柱体粗细</div>
       <div style="display:flex;align-items:center;gap:6px">
         <input type="range" id="barWidthRange" min="8" max="28" value="16" style="flex:1;accent-color:var(--c-green);height:4px">
         <span id="barWidthLabel" style="font-size:var(--f-xs);color:var(--t3);min-width:20px;text-align:right">16</span>
@@ -404,6 +413,47 @@ let activeHeaderIds=new Set(); // 当前激活的表头 id
 // 暂存
 let complexStaging=[], complexGroups=[];
 let simpleQIdx=-1, simpleSelected=new Set();
+
+// ── 自动保存 ──────────────────────────────────────
+const AUTOSAVE_KEY='sloth-config-autosave';
+let autoSaveTimer=null;
+
+function autoSave(){
+  if(autoSaveTimer)clearTimeout(autoSaveTimer);
+  autoSaveTimer=setTimeout(()=>{
+    try{
+      const config={version:5,groups,headerLibrary,headerIdCounter,activeHeaderIds:[...activeHeaderIds],displayMode,decimalPlaces,showDiff,barMaxWidth,currentTheme};
+      localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(config));
+    }catch(e){console.warn('自动保存失败:',e)}
+  },500); // 500ms 防抖
+}
+
+function loadAutoSave(){
+  try{
+    const saved=localStorage.getItem(AUTOSAVE_KEY);
+    if(!saved)return false;
+    const config=JSON.parse(saved);
+    if(config.version!==5)return false;
+    groups=config.groups||[];groupIdCounter=groups.length?Math.max(...groups.map(g=>g.id))+1:0;
+    headerLibrary=config.headerLibrary||[];headerIdCounter=config.headerIdCounter||0;
+    activeHeaderIds=new Set(config.activeHeaderIds||[]);
+    displayMode=config.displayMode||'percent';decimalPlaces=config.decimalPlaces??1;showDiff=config.showDiff||false;
+    barMaxWidth=config.barMaxWidth||16;currentTheme=config.currentTheme||'light';
+    // 恢复 UI
+    document.querySelectorAll('#modeOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.mode===displayMode));
+    document.querySelectorAll('#decimalOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.decimal==decimalPlaces));
+    document.getElementById('diffToggle').classList.toggle('on',showDiff);
+    document.getElementById('barWidthRange').value=barMaxWidth;
+    document.getElementById('barWidthLabel').textContent=barMaxWidth;
+    document.documentElement.setAttribute('data-theme',currentTheme);
+    document.getElementById('themeToggle').textContent=currentTheme==='dark'?'☀️':'🌙';
+    return true;
+  }catch(e){return false}
+}
+
+function clearAutoSave(){
+  localStorage.removeItem(AUTOSAVE_KEY);
+}
 
 // ── 常量 ──────────────────────────────────────────
 const SCROLL_MARGIN = '-36px 0px -55% 0px';
@@ -508,7 +558,7 @@ function buildFilter(hdr){
 function getActiveHeaders(){return headerLibrary.filter(h=>activeHeaderIds.has(h.id))}
 
 // ── 渲染全部 ──────────────────────────────────────
-function renderAll(){renderSidebar();renderMain();renderHeaderLib()}
+function renderAll(){renderSidebar();renderMain();renderHeaderLib();autoSave()}
 
 // ── 左侧目录 ──────────────────────────────────────
 function renderSidebar(){
@@ -527,6 +577,10 @@ function navItem(i){
   const q=questions[i],d=document.createElement('div');
   d.className='nav-item';d.dataset.index=i;d.dataset.type='question';
   d.innerHTML=`<div class="nav-num">${escapeHtml(q.id)}</div><div class="nav-label">${escapeHtml(q.title)}</div><div class="nav-type ${escapeHtml(q.type)}">${q.type==='single'?'单':'多'}</div>`;
+  // 搜索过滤
+  if(searchQuery && !q.title.toLowerCase().includes(searchQuery) && !q.id.toString().includes(searchQuery)){
+    d.style.display='none';
+  }
   d.addEventListener('click',()=>document.getElementById('chart-'+i).scrollIntoView({behavior:'smooth',block:'start'}));
   // 拖拽组到题目之间
   d.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';showDropIndicator(d,e)});
@@ -597,12 +651,16 @@ function renderMain(){
     main.appendChild(hdr);
   });
   while(qIdx<questions.length){main.appendChild(chartSection(qIdx));qIdx++}
-  renderCharts();initObserver();
+  renderCharts();initObserver();autoSave();
 }
 
 function chartSection(i){
   const q=questions[i],sec=document.createElement('div');
   sec.className='chart-section';sec.id='chart-'+i;
+  // 搜索过滤
+  if(searchQuery && !q.title.toLowerCase().includes(searchQuery) && !q.id.toString().includes(searchQuery)){
+    sec.style.display='none';
+  }
   const ah=getActiveHeaders();
   const chartH=Math.max(q.labels.length*CHART_ROW_HEIGHT+14,CHART_MIN_HEIGHT);
   let colsHtml='<div class="chart-columns">';
@@ -755,16 +813,44 @@ function copyQuestionData(qi){
   const q=questions[qi],ah=getActiveHeaders();
   const cols=['选项','Total (n='+q.total+')'];
   ah.forEach(h=>cols.push(h.name+' (n='+h.baseCount+')'));
-  let md='**Q'+q.id+'. '+q.title+'**\n*'+(q.type==='single'?'单选':'多选')+' · '+q.total+'人*\n\n';
-  md+='| '+cols.join(' | ')+' |\n| '+cols.map(()=>':---').join(' | ')+' |\n';
+  
+  // 构建 HTML 表格
+  let html='<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse">';
+  html+='<tr style="background:var(--c-beige-l)"><th>'+cols.join('</th><th>')+'</th></tr>';
+  
+  // 构建纯文本表格（用于文本粘贴）
+  let text=cols.join('\t')+'\n';
+  
   q.labels.forEach((label,li)=>{
-    const row=['`'+label+'`',q.percents[li]+'% ('+q.counts[li]+'人)'];
-    ah.forEach(hdr=>{const s=computeSubset(qi,buildFilter(hdr));row.push(s?s.percents[li]+'% ('+s.counts[li]+'人)':'0% (0人)')});
-    md+='| '+row.join(' | ')+' |\n';
+    const row=[label,q.percents[li]+'% ('+q.counts[li]+'人)'];
+    const textRow=[label,q.percents[li]+'% ('+q.counts[li]+'人)'];
+    ah.forEach(hdr=>{
+      const s=computeSubset(qi,buildFilter(hdr));
+      row.push(s?s.percents[li]+'% ('+s.counts[li]+'人)':'0% (0人)');
+      textRow.push(s?s.percents[li]+'% ('+s.counts[li]+'人)':'0% (0人)');
+    });
+    html+='<tr><td>'+row.join('</td><td>')+'</td></tr>';
+    text+=textRow.join('\t')+'\n';
   });
-  navigator.clipboard.writeText(md).then(()=>{
+  html+='</table>';
+  
+  // 同时复制 HTML 和纯文本
+  const blob=new Blob([html],{type:'text/html'});
+  const textBlob=new Blob([text],{type:'text/plain'});
+  const item=new ClipboardItem({
+    'text/html': blob,
+    'text/plain': textBlob
+  });
+  
+  navigator.clipboard.write([item]).then(()=>{
     const btn=document.querySelector(`.copy-btn[data-qi="${qi}"]`);
     if(btn){btn.textContent='已复制';btn.classList.add('copied');setTimeout(()=>{btn.textContent='复制';btn.classList.remove('copied')},1200)}
+  }).catch(()=>{
+    // 降级方案：复制纯文本
+    navigator.clipboard.writeText(text).then(()=>{
+      const btn=document.querySelector(`.copy-btn[data-qi="${qi}"]`);
+      if(btn){btn.textContent='已复制';btn.classList.add('copied');setTimeout(()=>{btn.textContent='复制';btn.classList.remove('copied')},1200)}
+    });
   });
   slothPulse();
 }
@@ -989,6 +1075,19 @@ document.getElementById('reuploadBtn').addEventListener('click',()=>{
   document.getElementById('dashboard').style.display='none';
   document.getElementById('uploadPage').style.display='flex';
   fileInput.value='';
+  clearAutoSave();
+});
+
+// ── 搜索功能 ──────────────────────────────────────
+let searchQuery='';
+document.getElementById('searchInput').addEventListener('input',function(){
+  searchQuery=this.value.trim().toLowerCase();
+  renderAll();
+  // 如果有搜索词，自动滚动到第一个匹配项
+  if(searchQuery){
+    const firstMatch=document.querySelector('.nav-item:not([style*="display: none"])');
+    if(firstMatch)firstMatch.click();
+  }
 });
 
 // ── 滚动高亮 ──────────────────────────────────────
