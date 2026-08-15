@@ -1,8 +1,28 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 
-const APP_URL = 'file://' + path.resolve(__dirname, '../index.html');
-const TEST_EXCEL = '/Users/mac/Downloads/test_fruit.xlsx';
+const ROOT = path.resolve(__dirname, '..');
+const TEST_EXCEL = path.join(ROOT, 'scripts', 'test-data.xlsx');
+const APP_URL = 'http://localhost:8766/index.html';
+
+// 启动本地 HTTP 服务器（避免 file:// 协议下 setInputFiles 不稳定）
+let server;
+test.beforeAll(async () => {
+  server = http.createServer((req, res) => {
+    const filePath = path.join(ROOT, req.url === '/' ? 'index.html' : req.url);
+    const ext = path.extname(filePath);
+    const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+    try {
+      const data = fs.readFileSync(filePath);
+      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+      res.end(data);
+    } catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise(r => server.listen(8766, r));
+});
+test.afterAll(async () => { if (server) server.close(); });
 
 // ── 工具函数 ──────────────────────────────────────
 async function uploadFile(page, filePath) {

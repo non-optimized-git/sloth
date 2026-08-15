@@ -27,7 +27,7 @@
   /* 文字 */
   --t1:#3c3228;--t2:#6b5d50;--t3:#a89880;
   /* 组件 */
-  --bar-color:#e0d7cc;
+  --c-bar:#e0d7cc;
   /* 尺寸 */
   --sidebar-w:228px;--toolbox-w:188px;--header-h:44px;
   --radius-s:3px;--radius-m:5px;--radius-l:8px;
@@ -45,7 +45,7 @@
   --c-amber:#c4a06a;--c-amber-l:#332e26;
   --c-teal:#6aaa9a;--c-teal-l:#263030;
   --t1:#e8ddd0;--t2:#a89880;--t3:#6b5d50;
-  --bar-color:#5a524a;
+  --c-bar:#5a524a;
 }
 
 /* ── 基础 ──────────────────────────── */
@@ -405,6 +405,21 @@ let activeHeaderIds=new Set(); // 当前激活的表头 id
 let complexStaging=[], complexGroups=[];
 let simpleQIdx=-1, simpleSelected=new Set();
 
+// ── 常量 ──────────────────────────────────────────
+const SCROLL_MARGIN = '-36px 0px -55% 0px';
+const ANIMATION_DELAY_MS = 35;
+const CHART_MIN_HEIGHT = 90;
+const CHART_ROW_HEIGHT = 24;
+const NAV_LABEL_MAX_LEN = 13;
+
+// ── XSS 防护 ──────────────────────────────────────
+function escapeHtml(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 // ── 树懒交互 ──────────────────────────────────────
 function slothPulse(){
   const icon=document.querySelector('.header .si');
@@ -437,6 +452,7 @@ function parseExcel(file){
   reader.onload=function(e){
     try{
       const wb=XLSX.read(e.target.result,{type:'array'});
+      if(!wb.SheetNames.length){alert('Excel 文件无工作表');return}
       const ws=wb.Sheets[wb.SheetNames[0]];
       const data=XLSX.utils.sheet_to_json(ws,{defval:''});
       if(!data.length){alert('表格无数据');return}
@@ -510,7 +526,7 @@ function renderSidebar(){
 function navItem(i){
   const q=questions[i],d=document.createElement('div');
   d.className='nav-item';d.dataset.index=i;d.dataset.type='question';
-  d.innerHTML=`<div class="nav-num">${q.id}</div><div class="nav-label">${q.title}</div><div class="nav-type ${q.type}">${q.type==='single'?'单':'多'}</div>`;
+  d.innerHTML=`<div class="nav-num">${escapeHtml(q.id)}</div><div class="nav-label">${escapeHtml(q.title)}</div><div class="nav-type ${escapeHtml(q.type)}">${q.type==='single'?'单':'多'}</div>`;
   d.addEventListener('click',()=>document.getElementById('chart-'+i).scrollIntoView({behavior:'smooth',block:'start'}));
   // 拖拽组到题目之间
   d.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';showDropIndicator(d,e)});
@@ -521,7 +537,7 @@ function navItem(i){
 function navGroupTitle(g){
   const d=document.createElement('div');
   d.className='nav-group-title';d.dataset.groupId=g.id;d.draggable=true;
-  d.innerHTML=`<span class="gt" title="双击编辑名称">${g.name}</span><div><button class="gb" title="删除" onclick="deleteGroup(${g.id})">✕</button></div>`;
+  d.innerHTML=`<span class="gt" title="双击编辑名称">${escapeHtml(g.name)}</span><div><button class="gb" title="删除" onclick="deleteGroup(${g.id})">✕</button></div>`;
   // 双击编辑名称
   const gt=d.querySelector('.gt');
   gt.addEventListener('dblclick',()=>{
@@ -577,7 +593,7 @@ function renderMain(){
   sorted.forEach(g=>{
     while(qIdx<=g.afterIndex&&qIdx<questions.length){main.appendChild(chartSection(qIdx));qIdx++}
     const hdr=document.createElement('div');hdr.className='section-group-header';
-    hdr.innerHTML=`<div class="gl"></div><div class="gt2">${g.name}</div><div class="gl"></div>`;
+    hdr.innerHTML=`<div class="gl"></div><div class="gt2">${escapeHtml(g.name)}</div><div class="gl"></div>`;
     main.appendChild(hdr);
   });
   while(qIdx<questions.length){main.appendChild(chartSection(qIdx));qIdx++}
@@ -588,7 +604,7 @@ function chartSection(i){
   const q=questions[i],sec=document.createElement('div');
   sec.className='chart-section';sec.id='chart-'+i;
   const ah=getActiveHeaders();
-  const chartH=Math.max(q.labels.length*24+14,90);
+  const chartH=Math.max(q.labels.length*CHART_ROW_HEIGHT+14,CHART_MIN_HEIGHT);
   let colsHtml='<div class="chart-columns">';
   colsHtml+=`<div class="chart-col"><div class="col-header total-col">Total <span class="col-base">(n=${q.total})</span></div><div class="chart-container" id="echart-${i}-0" style="height:${chartH}px"></div></div>`;
   ah.forEach((hdr,hi)=>{
@@ -660,12 +676,12 @@ function renderCharts(){
         },
         grid:{left:3,right:10,top:2,bottom:3,containLabel:true},
         xAxis:{type:'value',axisLabel:{color:getCSS('--t3')||'#a89880',fontSize:7,formatter:v=>v+'%'},splitLine:{lineStyle:{type:'dashed',color:getCSS('--c-beige')||'#e8ddd0'}},axisLine:{show:false},axisTick:{show:false}},
-        yAxis:{type:'category',data:revLabels,axisLabel:{show:ci===0,color:getCSS('--t2')||'#6b5d50',fontSize:8,width:95,overflow:'truncate',formatter:v=>v.length>13?v.substring(0,13)+'…':v},axisTick:{show:false},axisLine:{lineStyle:{color:getCSS('--c-border')||'#e6ddd3'}}},
+        yAxis:{type:'category',data:revLabels,axisLabel:{show:ci===0,color:getCSS('--t2')||'#6b5d50',fontSize:8,width:95,overflow:'truncate',formatter:v=>v.length>NAV_LABEL_MAX_LEN?v.substring(0,NAV_LABEL_MAX_LEN)+'…':v},axisTick:{show:false},axisLine:{lineStyle:{color:getCSS('--c-border')||'#e6ddd3'}}},
         series:[{
           type:'bar',data:col.data.slice().reverse(),barMaxWidth:barMaxWidth,
           itemStyle:{borderRadius:[0,5,5,0],color:p=>{return itemColors.length?itemColors[q.labels.length-1-p.dataIndex]:barColor()}},
           label:{show:true,position:'right',fontSize:7,color:getCSS('--t2')||'#6b5d50',formatter:p=>{const idx=q.labels.length-1-p.dataIndex;return fmtLabel({counts:col.data,percents:col.percents},idx)}},
-          animationDuration:500,animationEasing:'cubicOut',animationDelay:idx=>(revLabels.length-1-idx)*35
+          animationDuration:500,animationEasing:'cubicOut',animationDelay:idx=>(revLabels.length-1-idx)*ANIMATION_DELAY_MS
         }]
       });
     });
@@ -682,7 +698,7 @@ function renderHeaderLib(){
     d.className='hl-item'+(activeHeaderIds.has(hdr.id)?' active':'');
     d.dataset.hid=hdr.id;
     const tip=hdr.filters.map(f=>'Q'+questions[f.questionIdx].id+':'+f.optionLabel).join(' + ');
-    d.innerHTML=`<div class="hl-grip" title="拖拽排序">⠿</div><div class="hl-dot"></div><div class="hl-name" title="${tip}">${hdr.name}</div><div class="hl-base">n=${hdr.baseCount}</div><div class="hl-edit" data-hid="${hdr.id}" title="编辑">✎</div><div class="hl-del" data-hid="${hdr.id}">×</div>`;
+    d.innerHTML=`<div class="hl-grip" title="拖拽排序">⠿</div><div class="hl-dot"></div><div class="hl-name" title="${escapeHtml(tip)}">${escapeHtml(hdr.name)}</div><div class="hl-base">n=${hdr.baseCount}</div><div class="hl-edit" data-hid="${hdr.id}" title="编辑">✎</div><div class="hl-del" data-hid="${hdr.id}">×</div>`;
     // 点击切换激活
     d.addEventListener('click',e=>{
       if(e.target.classList.contains('hl-del')||e.target.classList.contains('hl-grip'))return;
@@ -775,7 +791,7 @@ document.querySelectorAll('.picker-tab').forEach(tab=>{
 function renderSimplePicker(){
   const dd=document.getElementById('simpleQDropdown');
   dd.innerHTML='<option value="-1">请选择题目...</option>';
-  questions.forEach((q,i)=>dd.innerHTML+=`<option value="${i}">${q.title}</option>`);
+  questions.forEach((q,i)=>dd.innerHTML+=`<option value="${i}">${escapeHtml(q.title)}</option>`);
   dd.value=simpleQIdx;
   dd.onchange=()=>{simpleQIdx=parseInt(dd.value);simpleSelected=new Set();renderSimpleOpts()};
   if(simpleQIdx>=0)renderSimpleOpts();else document.getElementById('simpleOpts').innerHTML='';
@@ -785,7 +801,7 @@ function renderSimpleOpts(){
   const c=document.getElementById('simpleOpts');
   if(simpleQIdx<0){c.innerHTML='<div style="font-size:9px;color:var(--text3);padding:6px">请先选择题目</div>';return}
   const q=questions[simpleQIdx];
-  c.innerHTML=q.labels.map((l,li)=>`<div class="picker-opt${simpleSelected.has(l)?' selected':''}" data-label="${l}">${l}<span class="ob">(n=${q.counts[li]})</span></div>`).join('');
+  c.innerHTML=q.labels.map((l,li)=>`<div class="picker-opt${simpleSelected.has(l)?' selected':''}" data-label="${escapeHtml(l)}">${escapeHtml(l)}<span class="ob">(n=${q.counts[li]})</span></div>`).join('');
   c.querySelectorAll('.picker-opt').forEach(opt=>{
     opt.addEventListener('click',()=>{const l=opt.dataset.label;simpleSelected.has(l)?simpleSelected.delete(l):simpleSelected.add(l);renderSimpleOpts();renderSimplePreview()});
   });
@@ -895,6 +911,7 @@ document.getElementById('importBtn').addEventListener('click',()=>document.getEl
 document.getElementById('configFileInput').addEventListener('change',e=>{
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
+  reader.onerror=function(){alert('配置文件读取失败')};
   reader.onload=function(ev){
     try{
       const config=JSON.parse(ev.target.result);
@@ -988,7 +1005,7 @@ function initObserver(){
         if(target){target.classList.add('active');target.scrollIntoView({behavior:'smooth',block:'nearest'})}
       }
     });
-  },{rootMargin:'-36px 0px -55% 0px',threshold:0.1});
+  },{rootMargin:SCROLL_MARGIN,threshold:0.1});
   document.querySelectorAll('.chart-section').forEach(s=>observer.observe(s));
   if(navItems.length)navItems[0].classList.add('active');
 }
@@ -1015,7 +1032,7 @@ function openEditHeader(hid){
 function renderEditFilters(filters){
   const c=document.getElementById('editHeaderFilters');
   if(!filters.length){c.innerHTML='<div style="font-size:9px;color:var(--text3);padding:4px">无筛选条件</div>';return}
-  c.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:3px">'+filters.map((f,fi)=>`<span class="header-tag" data-fi="${fi}" style="cursor:pointer" title="点击移除">Q${questions[f.questionIdx].id}: ${f.optionLabel} ×</span>`).join('')+'</div>';
+  c.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:3px">'+filters.map((f,fi)=>`<span class="header-tag" data-fi="${fi}" style="cursor:pointer" title="点击移除">Q${escapeHtml(questions[f.questionIdx].id)}: ${escapeHtml(f.optionLabel)} ×</span>`).join('')+'</div>';
   c.querySelectorAll('.header-tag').forEach(tag=>{
     tag.addEventListener('click',()=>{
       const hdr=headerLibrary.find(h=>h.id===editingHeaderId);
@@ -1032,10 +1049,10 @@ function renderEditPicker(excludeFilters){
   const c=document.getElementById('editHeaderPicker');
   let h='';
   questions.forEach((q,qi)=>{
-    h+=`<div class="picker-q"><div class="picker-q-title">${q.title}</div><div class="picker-opts">`;
+    h+=`<div class="picker-q"><div class="picker-q-title">${escapeHtml(q.title)}</div><div class="picker-opts">`;
     q.labels.forEach((l,li)=>{
       const already=excludeFilters.some(f=>f.questionIdx===qi&&f.optionLabel===l);
-      h+=`<div class="picker-opt${already?' selected':''}" data-qi="${qi}" data-label="${l}" ${already?'style="opacity:.4;pointer-events:none"':''}>${l}<span class="ob">(n=${q.counts[li]})</span></div>`;
+      h+=`<div class="picker-opt${already?' selected':''}" data-qi="${qi}" data-label="${escapeHtml(l)}" ${already?'style="opacity:.4;pointer-events:none"':''}>${escapeHtml(l)}<span class="ob">(n=${q.counts[li]})</span></div>`;
     });
     h+='</div></div>';
   });
