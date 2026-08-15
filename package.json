@@ -1,0 +1,21 @@
+{
+  "name": "survey-dashboard",
+  "version": "1.0.0",
+  "description": "> 慢一点，看清数据。",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
