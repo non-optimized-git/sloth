@@ -350,6 +350,12 @@ a,button,.btn,.nav-item,.hl-item,.seg,.toggle-row,.upload-area,.add-group-btn,.h
 .file-card-delete{position:absolute;top:12px;right:12px;background:none;border:none;font-size:14px;color:var(--t3);cursor:pointer;opacity:0;transition:opacity .15s;padding:4px;border-radius:var(--radius-s)}
 .file-card:hover .file-card-delete{opacity:1}
 .file-card-delete:hover{color:var(--c-red);background:var(--c-red-l)}
+
+/* ── 文件卡片下载按钮 ─────────────────── */
+.file-card-download{position:absolute;top:12px;right:40px;background:none;border:none;font-size:14px;color:var(--t3);cursor:pointer;opacity:0;transition:opacity .15s;padding:4px;border-radius:var(--radius-s)}
+.file-card:hover .file-card-download{opacity:1}
+.file-card-download:hover{color:var(--c-green)}
+
 .files-empty{text-align:center;padding:60px 20px;color:var(--t3)}
 .files-empty-icon{font-size:48px;margin-bottom:12px}
 .files-empty-text{font-size:var(--f-md)}
@@ -1634,6 +1640,7 @@ async function loadFilesGrid() {
       const size = SlothStorage.formatSize(f.file_size);
       const date = new Date(f.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       return '<div class="file-card" data-path="' + f.file_path + '" data-name="' + escapeAttr(f.file_name) + '" title="点击查看图表">'
+        + '<button class="file-card-download" data-path="' + f.file_path + '" data-name="' + escapeAttr(f.file_name) + '" title="下载原始文件" onclick="event.stopPropagation();downloadSlothFile(this.dataset.path, this.dataset.name)">⬇️</button>'
         + '<button class="file-card-delete" data-id="' + f.id + '" data-path="' + f.file_path + '" title="删除">✕</button>'
         + '<div class="file-card-icon">' + icon + '</div>'
         + '<div class="file-card-name">' + escapeHtml(f.file_name) + '</div>'
@@ -1780,76 +1787,3 @@ function escapeAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&q
 </script>
 </body>
 </html>
-
-// ── 提取 Excel 元数据（车型、姓名、城市等）──────
-function extractExcelMetadata(jsonData) {
-  if (!jsonData || !jsonData.length) return {};
-  
-  const meta = {};
-  const firstRow = jsonData[0];
-  const keys = Object.keys(firstRow);
-  
-  // 常见字段映射
-  const fieldPatterns = {
-    car: ['车型', '汽车', '车辆', '品牌', '型号', 'car', 'model'],
-    name: ['姓名', '名字', '名称', '车主', '用户', 'name'],
-    city: ['城市', '地区', '所在地', '省', '市', 'city', 'region'],
-    activity: ['活动', '体验', '项目', '场景', 'activity'],
-    item: ['物品', '商品', '产品', 'item', 'product']
-  };
-  
-  // 遍历列名，匹配字段
-  keys.forEach(key => {
-    const lowerKey = key.toLowerCase();
-    Object.entries(fieldPatterns).forEach(([field, patterns]) => {
-      if (patterns.some(p => lowerKey.includes(p))) {
-        // 取前3个不重复的值
-        const values = [...new Set(jsonData.slice(0, 10).map(row => String(row[key] || '')).filter(v => v))];
-        if (values.length > 0) {
-          meta[field] = values.slice(0, 3).join('、');
-        }
-      }
-    });
-  });
-  
-  // 如果没有匹配到，用第一列作为标题
-  if (Object.keys(meta).length === 0 && keys.length > 0) {
-    const firstColValues = [...new Set(jsonData.slice(0, 5).map(row => String(row[keys[0]] || '')).filter(v => v))];
-    if (firstColValues.length > 0) {
-      meta.title = firstColValues.slice(0, 2).join('、');
-    }
-  }
-  
-  return meta;
-}
-
-// ── 生成卡片标题 ──────────────────────────────────
-function getCardTitle(metadata, fileName) {
-  if (!metadata || Object.keys(metadata).length === 0) {
-    return fileName.replace(/\.\w+$/, ''); // 去掉扩展名
-  }
-  
-  const parts = [];
-  if (metadata.car) parts.push(metadata.car);
-  if (metadata.activity) parts.push(metadata.activity);
-  if (metadata.item) parts.push(metadata.item);
-  if (metadata.title) parts.push(metadata.title);
-  
-  return parts.length > 0 ? parts.join(' · ') : fileName.replace(/\.\w+$/, '');
-}
-
-// ── 生成卡片描述 ──────────────────────────────────
-function getCardDesc(metadata) {
-  if (!metadata || Object.keys(metadata).length === 0) return '';
-  
-  const parts = [];
-  if (metadata.name) parts.push(metadata.name);
-  if (metadata.city) parts.push(metadata.city);
-  if (metadata.car && !parts.includes(metadata.car)) parts.push(metadata.car);
-  
-  return parts.length > 0 ? parts.join(' · ') : '';
-}
-
-/* ── Logo 可点击样式 ──────────────────── */
-#dashboardLogo:hover{opacity:.8}
-#dashboardLogo:active{opacity:.6}
