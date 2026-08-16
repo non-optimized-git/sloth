@@ -6,6 +6,10 @@
 <title>数览 Sloth · 数据看板</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-auth.js"></script>
+<script src="supabase-storage.js"></script>
 <style>
 /* ══════════════════════════════════════
    数览 Sloth · 设计系统 v5.0
@@ -69,7 +73,7 @@ a,button,.btn,.nav-item,.hl-item,.seg,.toggle-row,.upload-area,.add-group-btn,.h
 @keyframes fadeUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* ── 上传页 ────────────────────────── */
-.upload-page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--c-bg);transition:background-color .4s ease}
+.upload-page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--c-bg);transition:background-color .4s ease;position:relative}
 .upload-box{width:480px;padding:48px 36px;background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--radius-l);text-align:center;animation:fadeUp .4s ease;position:relative;overflow:hidden;transition:background-color .4s ease,border-color .4s ease}
 .upload-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c-green);opacity:.3}
 .upload-icon{font-size:56px;margin-bottom:8px}
@@ -266,11 +270,151 @@ a,button,.btn,.nav-item,.hl-item,.seg,.toggle-row,.upload-area,.add-group-btn,.h
 
 /* ── 响应式 ────────────────────────── */
 @media(max-width:900px){.sidebar{display:none}.main{margin-left:0;margin-right:0}.toolbox{display:none}}
+.sloth-user-bar{display:flex;align-items:center;gap:6px;margin-left:12px;flex-shrink:0}
+#slothLoginBtn{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:var(--radius-m);background:var(--c-green);color:#fff;font-size:var(--f-sm);font-weight:600;border:none;cursor:pointer;transition:opacity .15s}
+#slothLoginBtn:hover{opacity:.85}
+#slothUserInfo{display:none;align-items:center;gap:8px}
+#slothUserName{font-size:var(--f-sm);font-weight:600;color:var(--c-brown);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#slothLogoutBtn,#slothFilesBtn{padding:3px 10px;border-radius:var(--radius-m);border:1px solid var(--c-border);background:transparent;color:var(--t2);font-size:var(--f-xs);cursor:pointer;transition:all .15s}
+#slothLogoutBtn:hover{border-color:var(--c-red);color:var(--c-red)}
+#slothFilesBtn:hover{border-color:var(--c-green);color:var(--c-green)}
+
+/* ── 登录/注册弹窗 ───────────────── */
+.sauth-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.sauth-modal.hidden{display:none}
+.sauth-box{background:var(--c-card);border-radius:var(--radius-l);padding:28px 32px;width:380px;position:relative;border:1px solid var(--c-border);box-shadow:0 16px 48px rgba(0,0,0,.12)}
+.sauth-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c-green);opacity:.3;border-radius:var(--radius-l) var(--radius-l) 0 0}
+.sauth-box h3{font-size:var(--f-lg);font-weight:700;color:var(--c-brown);margin-bottom:16px;text-align:center}
+.sauth-close{position:absolute;top:12px;right:16px;background:none;border:none;font-size:18px;color:var(--t3);cursor:pointer}
+.sauth-tabs{display:flex;gap:0;margin-bottom:18px;border-bottom:1px solid var(--c-border)}
+.sauth-tab{flex:1;padding:8px 0;text-align:center;font-size:var(--f-sm);font-weight:500;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.sauth-tab:hover{color:var(--t2)}
+.sauth-tab.active{color:var(--c-green);border-bottom-color:var(--c-green);font-weight:600}
+.sauth-input{width:100%;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-m);font-size:var(--f-md);outline:none;margin-bottom:10px;background:var(--c-card);color:var(--t1);transition:border-color .15s}
+.sauth-input:focus{border-color:var(--c-green)}
+.sauth-submit{width:100%;padding:10px 0;border:none;border-radius:var(--radius-m);background:var(--c-green);color:#fff;font-size:var(--f-md);font-weight:600;cursor:pointer;transition:opacity .15s;margin-bottom:10px}
+.sauth-submit:hover{opacity:.88}
+.sauth-divider{display:flex;align-items:center;gap:8px;margin:14px 0;font-size:var(--f-xs);color:var(--t3)}
+.sauth-divider::before,.sauth-divider::after{content:'';flex:1;height:1px;background:var(--c-border)}
+.sauth-oauth{display:flex;gap:8px}
+.sauth-oauth-btn{flex:1;padding:9px 0;border:1px solid var(--c-border);border-radius:var(--radius-m);background:var(--c-card);color:var(--t1);font-size:var(--f-sm);font-weight:500;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.sauth-oauth-btn:hover{border-color:var(--c-green);background:var(--c-green-l)}
+.sauth-error{display:none;background:var(--c-red-l);color:var(--c-red);padding:8px 12px;border-radius:var(--radius-m);font-size:var(--f-sm);margin-bottom:10px;text-align:center}
+
+/* ── 文件管理弹窗 ────────────────── */
+.sfiles-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:250;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.sfiles-modal.hidden{display:none}
+.sfiles-box{background:var(--c-card);border-radius:var(--radius-l);padding:24px;width:560px;max-height:75vh;display:flex;flex-direction:column;border:1px solid var(--c-border);box-shadow:0 16px 48px rgba(0,0,0,.12);position:relative}
+.sfiles-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c-green);opacity:.3;border-radius:var(--radius-l) var(--radius-l) 0 0}
+.sfiles-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sfiles-header h3{font-size:var(--f-lg);font-weight:700;color:var(--c-brown)}
+.sfiles-close{background:none;border:none;font-size:18px;color:var(--t3);cursor:pointer}
+.sfiles-upload-area{border:2px dashed var(--c-border);border-radius:var(--radius-m);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--c-beige-l);margin-bottom:14px}
+.sfiles-upload-area:hover{border-color:var(--c-green);background:var(--c-green-l)}
+.sfiles-upload-area.dragover{border-color:var(--c-green);background:var(--c-green-l)}
+.sfiles-upload-area input{display:none}
+.sfiles-upload-area p{font-size:var(--f-sm);color:var(--t2)}
+.sfiles-list{flex:1;overflow-y:auto;min-height:0}
+.sfiles-empty{text-align:center;padding:30px;color:var(--t3);font-size:var(--f-sm)}
+.sfiles-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--c-border);border-radius:var(--radius-m);margin-bottom:6px;transition:border-color .15s}
+.sfiles-item:hover{border-color:var(--c-green)}
+.sfiles-icon{font-size:24px;flex-shrink:0}
+.sfiles-info{flex:1;min-width:0}
+.sfiles-name{font-size:var(--f-sm);font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfiles-meta{font-size:var(--f-xs);color:var(--t3);margin-top:2px}
+.sfiles-actions{display:flex;gap:6px;flex-shrink:0}
+.sfiles-btn{padding:4px 10px;border-radius:var(--radius-s);border:1px solid var(--c-border);background:transparent;color:var(--t2);font-size:var(--f-xs);cursor:pointer;transition:all .15s}
+.sfiles-btn:hover{border-color:var(--c-green);color:var(--c-green)}
+.sfiles-btn.danger:hover{border-color:var(--c-red);color:var(--c-red)}
+.sfiles-status{padding:8px 0;text-align:center;font-size:var(--f-sm);color:var(--c-green);display:none}
+/* ── 上传页顶部栏 ──────────────────── */
+.upload-topbar{display:flex;justify-content:flex-end;align-items:center;padding:16px 24px;width:100%;position:absolute;top:0;left:0;right:0;z-index:10}
+.upload-topbar .btn{font-size:var(--f-sm)}
+.upload-topbar-user{display:flex;align-items:center;gap:8px}
+.upload-topbar-user .user-email{font-size:var(--f-xs);color:var(--t2);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── 我的文件页 ─────────────────────── */
+.files-page{display:none;min-height:100vh;background:var(--c-bg)}
+.files-page-header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--c-border);background:var(--c-card)}
+.files-page-header .logo{font-size:var(--f-lg);font-weight:700;color:var(--c-brown);display:flex;align-items:center;gap:6px}
+.files-page-header .logo .si{font-size:20px}
+.files-page-header .actions{display:flex;align-items:center;gap:8px}
+.files-page-body{max-width:960px;margin:0 auto;padding:28px 24px}
+.files-page-title{font-size:18px;font-weight:700;color:var(--c-brown);margin-bottom:20px}
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.file-card{background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--radius-l);padding:18px;cursor:pointer;transition:all .2s;position:relative}
+.file-card:hover{border-color:var(--c-green);box-shadow:0 4px 16px rgba(0,0,0,.06);transform:translateY(-2px)}
+.file-card-icon{font-size:32px;margin-bottom:10px}
+.file-card-name{font-size:var(--f-md);font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+.file-card-meta{font-size:var(--f-xs);color:var(--t3);display:flex;gap:12px}
+.file-card-delete{position:absolute;top:12px;right:12px;background:none;border:none;font-size:14px;color:var(--t3);cursor:pointer;opacity:0;transition:opacity .15s;padding:4px;border-radius:var(--radius-s)}
+.file-card:hover .file-card-delete{opacity:1}
+.file-card-delete:hover{color:var(--c-red);background:var(--c-red-l)}
+.files-empty{text-align:center;padding:60px 20px;color:var(--t3)}
+.files-empty-icon{font-size:48px;margin-bottom:12px}
+.files-empty-text{font-size:var(--f-md)}
+.files-loading{text-align:center;padding:60px 20px;color:var(--t3)}
+
 </style>
+
 </head>
 <body>
 
+<!-- ═══ Supabase 登录/注册弹窗 ═══ -->
+<div class="sauth-modal hidden" id="slothLoginModal">
+  <div class="sauth-box">
+    <button class="sauth-close" id="sauthClose">✕</button>
+    <h3>🦥 登录数览</h3>
+    <div class="sauth-tabs">
+      <div class="sauth-tab active" data-tab="login">登录</div>
+      <div class="sauth-tab" data-tab="signup">注册</div>
+    </div>
+    <div class="sauth-error" id="sauthError"></div>
+    <div id="sauthLoginForm">
+      <input class="sauth-input" type="email" id="sauthLoginEmail" placeholder="邮箱地址">
+      <input class="sauth-input" type="password" id="sauthLoginPwd" placeholder="密码">
+      <button class="sauth-submit" id="sauthLoginSubmit">登录</button>
+    </div>
+    <div id="sauthSignupForm" style="display:none">
+      <input class="sauth-input" type="email" id="sauthSignupEmail" placeholder="邮箱地址">
+      <input class="sauth-input" type="password" id="sauthSignupPwd" placeholder="密码（至少 6 位）">
+      <button class="sauth-submit" id="sauthSignupSubmit">注册</button>
+    </div>
+    <div class="sauth-divider">或</div>
+    <div class="sauth-oauth">
+      <button class="sauth-oauth-btn" id="sauthGoogle" style="display:none">🔵 Google</button>
+      <button class="sauth-oauth-btn" id="sauthGitHub" style="display:none">⚫ GitHub</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 文件管理弹窗 ═══ -->
+<div class="sfiles-modal hidden" id="slothFilesModal">
+  <div class="sfiles-box">
+    <div class="sfiles-header">
+      <h3>📁 我的文件</h3>
+      <button class="sfiles-close" id="sfilesClose">✕</button>
+    </div>
+    <div class="sfiles-upload-area" id="sfilesUploadArea">
+      <p>📄 点击或拖拽上传文件（最大 20MB）</p>
+      <input type="file" id="sfilesUploadInput">
+    </div>
+    <div class="sfiles-status" id="sfilesStatus"></div>
+    <div class="sfiles-list" id="sfilesList">
+      <div class="sfiles-empty">暂无文件</div>
+    </div>
+  </div>
+</div>
+
 <div class="upload-page" id="uploadPage">
+  <div class="upload-topbar" id="uploadTopbar">
+  <span class="btn sm" id="uploadLoginBtn">🔐 登录</span>
+  <span class="upload-topbar-user" id="uploadUserInfo" style="display:none">
+    <span class="user-email" id="uploadUserName"></span>
+    <span class="btn sm" id="uploadMyFilesBtn">📁 我的文件</span>
+    <span class="btn sm" id="uploadLogoutBtn">退出</span>
+  </span>
+</div>
   <div class="upload-box">
     <div class="upload-icon">🦥</div>
     <div class="upload-title">数览 Sloth</div>
@@ -284,16 +428,46 @@ a,button,.btn,.nav-item,.hl-item,.seg,.toggle-row,.upload-area,.add-group-btn,.h
     <div class="upload-footer"><span class="paw">🐾</span> 数览 v5.0 · 慢工出细活 <span class="paw">🐾</span></div>
   </div>
 </div>
+<!-- ═══ 我的文件页 ═══ -->
+<div class="files-page" id="filesPage">
+  <div class="files-page-header">
+    <span class="logo"><span class="si">🦥</span>数览 Sloth</span>
+    <div class="actions">
+      <span class="btn sm primary" id="filesUploadBtn">＋ 上传新文件</span>
+      <input type="file" id="filesPageUploadInput" accept=".xlsx,.xls" style="display:none">
+      <span class="btn sm" id="filesBackUpload">回到首页</span>
+      <span class="upload-topbar-user">
+        <span class="user-email" id="filesPageUserName"></span>
+        <span class="btn sm" id="filesPageLogoutBtn">退出</span>
+      </span>
+    </div>
+  </div>
+  <div class="files-page-body">
+    <div class="files-page-title">📁 我的文件</div>
+    <div class="files-grid" id="filesGrid">
+      <div class="files-loading">加载中...</div>
+    </div>
+  </div>
+</div>
 
 <div class="dashboard" id="dashboard">
   <div class="header">
-    <span class="logo"><span class="si">🦥</span>数览</span>
+    <span class="logo" id="dashboardLogo" style="cursor:pointer" title="返回主页"><span class="si">🦥</span>数览</span>
     <span class="sub" id="headerSub"></span>
     <div class="actions">
       <input type="file" id="configFileInput" accept=".json" style="display:none">
       <span class="btn sm" id="importBtn">📂 导入</span>
       <span class="btn sm" id="exportBtn">📦 导出</span>
       <span class="btn sm" id="reuploadBtn">重新上传</span>
+      <span class="btn sm" id="backToHomeBtn">🏠 返回主页</span>
+            <span class="sloth-user-bar" id="slothUserBar">
+        <span class="btn sm" id="slothFilesBtn" style="display:none">📁 文件</span>
+        <span class="btn sm" id="slothLoginBtn">🔐 登录</span>
+        <span id="slothUserInfo">
+          <span id="slothUserName"></span>
+          <span class="btn sm" id="slothLogoutBtn" onclick="console.log("[点击] 退出按钮");SlothAuth.signOut()">退出</span>
+        </span>
+      </span>
       <span class="btn sm ghost" id="themeToggle" title="切换主题" style="user-select:none">🌙</span>
     </div>
   </div>
@@ -490,7 +664,7 @@ function slothPulse(){
 // ── 工具函数 ──────────────────────────────────────
 function getCSS(varName){return getComputedStyle(document.documentElement).getPropertyValue(varName).trim()}
 function fmtPct(v){return v.toFixed(decimalPlaces)+'%'}
-function fmtCnt(v){return v+'人'}
+function fmtCnt(v){return v}
 function fmtLabel(q,idx){
   if(displayMode==='percent') return fmtPct(q.percents[idx]);
   if(displayMode==='count') return fmtCnt(q.counts[idx]);
@@ -536,6 +710,7 @@ function parseExcel(file){
 
 function showDashboard(){
   document.getElementById('uploadPage').style.display='none';
+  document.getElementById('filesPage').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('headerSub').textContent=rawData.length+' 条数据 · '+questions.length+' 题';
   document.getElementById('sidebarResizer').style.left=getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
@@ -732,7 +907,7 @@ function renderCharts(){
     // 计算所有列的最大百分比，留出标签空间
     let maxPct=0;
     allCols.forEach(col=>{col.percents.forEach(p=>{if(p>maxPct)maxPct=p})});
-    const xMax=Math.min(Math.ceil(maxPct/10)*10+15,120);
+    const xMax=Math.min(Math.ceil(maxPct/10)*10+5,120);
     
     allCols.forEach((col,ci)=>{
       const dom=document.getElementById('echart-'+i+'-'+ci);
@@ -1087,8 +1262,25 @@ const fileInput=document.getElementById('fileInput');
 uploadArea.addEventListener('click',()=>fileInput.click());
 uploadArea.addEventListener('dragover',e=>{e.preventDefault();uploadArea.classList.add('dragover')});
 uploadArea.addEventListener('dragleave',()=>uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop',e=>{e.preventDefault();uploadArea.classList.remove('dragover');if(e.dataTransfer.files.length)parseExcel(e.dataTransfer.files[0])});
-fileInput.addEventListener('change',()=>{if(fileInput.files.length)parseExcel(fileInput.files[0])});
+uploadArea.addEventListener('drop',e=>{e.preventDefault();uploadArea.classList.remove('dragover');if(e.dataTransfer.files.length)handleUpload(e.dataTransfer.files[0])});
+fileInput.addEventListener('change',()=>{if(fileInput.files.length)handleUpload(fileInput.files[0])});
+
+// 统一上传处理：已登录则上传到 Supabase，未登录则本地解析
+async function handleUpload(file) {
+  // 先本地解析显示图表
+  parseExcel(file);
+  
+  // 如果已登录，同时上传到 Supabase
+  if (SlothAuth.isLoggedIn()) {
+    try {
+      await SlothStorage.uploadFile(file);
+      console.log('[上传] 文件已保存到云端');
+    } catch (err) {
+      console.error('[上传] 云端保存失败:', err);
+      alert('云端保存失败: ' + err.message + '\n（本地仍可正常使用）');
+    }
+  }
+}
 // ── 侧栏拖拽调整 ──────────────────────────────────
 (function(){
   const resizer=document.getElementById('sidebarResizer');
@@ -1133,9 +1325,15 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
 // ── 重新上传 ──────────────────────────────────────
 document.getElementById('reuploadBtn').addEventListener('click',()=>{
   document.getElementById('dashboard').style.display='none';
-  document.getElementById('uploadPage').style.display='flex';
   fileInput.value='';
   clearAutoSave();
+  // 已登录显示文件页，未登录显示上传页
+  if (typeof SlothAuth !== 'undefined' && SlothAuth.isLoggedIn()) {
+    showPage('files');
+    loadFilesGrid();
+  } else {
+    showPage('upload');
+  }
 });
 
 // ── 搜索功能 ──────────────────────────────────────
@@ -1265,5 +1463,393 @@ document.getElementById('editHeaderModal').addEventListener('click',e=>{
   if(e.target.id==='editHeaderModal')document.getElementById('editHeaderModal').classList.add('hidden');
 });
 </script>
+
+<script>
+// ── 页面切换函数 ────────────────────────────────
+window.showPage = function(page) {
+  document.getElementById('uploadPage').style.display = page === 'upload' ? 'flex' : 'none';
+  document.getElementById('filesPage').style.display = page === 'files' ? 'block' : 'none';
+  document.getElementById('dashboard').style.display = page === 'dashboard' ? 'block' : 'none';
+};
+
+// ── Supabase 初始化 ──────────────────────────────
+(async function initSlothSupabase() {
+  if (typeof supabase === 'undefined' || typeof supabaseClient === 'undefined') {
+    console.warn('[Sloth] Supabase SDK 未加载，跳过云功能');
+    return;
+  }
+
+  // ── 页面切换函数已在上方定义 ──────────────────
+
+  // ── 初始化认证 ─────────────────────────────────
+  await SlothAuth.init((user) => {
+    updateUploadPageAuthUI(user);
+    updateFilesPageAuthUI(user);
+    
+    const dashboard = document.getElementById('dashboard');
+    const uploadPage = document.getElementById('uploadPage');
+    const filesPage = document.getElementById('filesPage');
+    
+    if (user) {
+      // 登录后：如果在上传页且没在看图表，显示文件页
+      if (uploadPage.style.display !== 'none' && dashboard.style.display !== 'block') {
+        showPage('files');
+        loadFilesGrid();
+      }
+      // 如果文件管理弹窗打开，刷新列表
+      if (!document.getElementById('slothFilesModal').classList.contains('hidden')) {
+        refreshFilesList();
+      }
+    } else {
+      // 退出后：回到上传页
+      if (filesPage.style.display !== 'none') {
+        showPage('upload');
+      }
+      // 如果在图表页，保持不动
+    }
+  });
+  SlothAuth.bindEvents();
+
+  // ── 上传页顶部栏事件 ───────────────────────────
+  document.getElementById('uploadLoginBtn')?.addEventListener('click', () => SlothAuth.openLoginModal());
+  document.getElementById('uploadLogoutBtn')?.addEventListener('click', () => SlothAuth.signOut());
+  document.getElementById("slothLogoutBtn")?.addEventListener("click", () => SlothAuth.signOut());
+  // Logo 点击返回主页
+  document.getElementById("dashboardLogo")?.addEventListener("click", () => {
+    if (SlothAuth.isLoggedIn()) {
+      showPage("files");
+      loadFilesGrid();
+    } else {
+      showPage("upload");
+    }
+  });
+  // 返回主页按钮
+  document.getElementById("backToHomeBtn")?.addEventListener("click", () => {
+    if (SlothAuth.isLoggedIn()) {
+      showPage("files");
+      loadFilesGrid();
+    } else {
+      showPage("upload");
+    }
+  });
+  document.getElementById('uploadMyFilesBtn')?.addEventListener('click', () => {
+    showPage('files');
+    loadFilesGrid();
+  });
+
+  // ── 我的文件页事件 ─────────────────────────────
+  document.getElementById('filesUploadBtn')?.addEventListener('click', () => {
+    document.getElementById('filesPageUploadInput').click();
+  });
+  document.getElementById('filesPageUploadInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      await SlothStorage.uploadFile(file);
+      loadFilesGrid();
+    } catch (err) {
+      alert('上传失败: ' + err.message);
+    }
+  });
+  document.getElementById('filesBackUpload')?.addEventListener('click', () => {
+    showPage('upload');
+  });
+  document.getElementById('filesPageLogoutBtn')?.addEventListener('click', () => SlothAuth.signOut());
+
+  // ── 文件管理弹窗事件（保留原有弹窗功能）────────
+  const filesModal = document.getElementById('slothFilesModal');
+  const filesBtn = document.getElementById('slothFilesBtn');
+  const filesClose = document.getElementById('sfilesClose');
+  const uploadArea = document.getElementById('sfilesUploadArea');
+  const uploadInput = document.getElementById('sfilesUploadInput');
+
+  filesBtn?.addEventListener('click', () => {
+    filesModal.classList.remove('hidden');
+    refreshFilesList();
+  });
+  filesClose?.addEventListener('click', () => filesModal.classList.add('hidden'));
+  filesModal?.addEventListener('click', e => {
+    if (e.target === filesModal) filesModal.classList.add('hidden');
+  });
+
+  uploadArea?.addEventListener('click', () => uploadInput.click());
+  uploadArea?.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea?.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea?.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleSlothFileUpload(e.dataTransfer.files[0]);
+  });
+  uploadInput?.addEventListener('change', () => {
+    if (uploadInput.files.length) handleSlothFileUpload(uploadInput.files[0]);
+    uploadInput.value = '';
+  });
+})();
+
+// ── 上传页认证 UI ────────────────────────────────
+function updateUploadPageAuthUI(user) {
+  const loginBtn = document.getElementById('uploadLoginBtn');
+  const userInfo = document.getElementById('uploadUserInfo');
+  const userName = document.getElementById('uploadUserName');
+  
+  if (user) {
+    loginBtn.style.display = 'none';
+    userInfo.style.display = 'flex';
+    userName.textContent = user.email || '用户';
+  } else {
+    loginBtn.style.display = 'inline-flex';
+    userInfo.style.display = 'none';
+  }
+}
+
+// ── 文件页认证 UI ────────────────────────────────
+function updateFilesPageAuthUI(user) {
+  const userName = document.getElementById('filesPageUserName');
+  if (user) {
+    userName.textContent = user.email || '用户';
+  }
+}
+
+// ── 加载文件卡片网格 ─────────────────────────────
+async function loadFilesGrid() {
+  const grid = document.getElementById('filesGrid');
+  if (!grid) return;
+  
+  if (!SlothAuth.isLoggedIn()) {
+    grid.innerHTML = '<div class="files-empty"><div class="files-empty-icon">🔐</div><div class="files-empty-text">请先登录查看文件</div></div>';
+    return;
+  }
+
+  grid.innerHTML = '<div class="files-loading">⏳ 加载中...</div>';
+
+  try {
+    const files = await SlothStorage.listFiles();
+    if (!files.length) {
+      grid.innerHTML = '<div class="files-empty"><div class="files-empty-icon">📂</div><div class="files-empty-text">暂无文件，点击右上角上传</div></div>';
+      return;
+    }
+
+    grid.innerHTML = files.map(f => {
+      const icon = getSlothFileIcon(f.file_type);
+      const size = SlothStorage.formatSize(f.file_size);
+      const date = new Date(f.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return '<div class="file-card" data-path="' + f.file_path + '" data-name="' + escapeAttr(f.file_name) + '" title="点击查看图表">'
+        + '<button class="file-card-delete" data-id="' + f.id + '" data-path="' + f.file_path + '" title="删除">✕</button>'
+        + '<div class="file-card-icon">' + icon + '</div>'
+        + '<div class="file-card-name">' + escapeHtml(f.file_name) + '</div>'
+        + '<div class="file-card-meta"><span>' + size + '</span><span>' + date + '</span></div>'
+        + '</div>';
+    }).join('');
+
+    // 绑定卡片点击事件
+    grid.querySelectorAll('.file-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.classList.contains('file-card-delete')) return;
+        const filePath = card.dataset.path;
+        const fileName = card.dataset.name;
+        loadFileFromStorage(filePath, fileName);
+      });
+    });
+
+    // 绑定删除按钮
+    grid.querySelectorAll('.file-card-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('确定删除此文件？')) return;
+        try {
+          await SlothStorage.deleteFile(btn.dataset.id, btn.dataset.path);
+          loadFilesGrid();
+        } catch (err) {
+          alert('删除失败: ' + err.message);
+        }
+      });
+    });
+  } catch (e) {
+    grid.innerHTML = '<div class="files-empty" style="color:var(--c-red)">加载失败: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// ── 从 Supabase Storage 加载文件并解析图表 ──────
+async function loadFileFromStorage(filePath, fileName) {
+  try {
+    const { data, error } = await supabaseClient.storage
+      .from(STORAGE_BUCKET)
+      .download(filePath);
+    if (error) throw error;
+
+    const arrayBuffer = await data.arrayBuffer();
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    if (!wb.SheetNames.length) { alert('Excel 文件无工作表'); return; }
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!jsonData.length) { alert('表格无数据'); return; }
+
+    headers = Object.keys(jsonData[0]);
+    rawData = jsonData;
+    questions = [];
+    headers.forEach((h, colIdx) => {
+      const vals = jsonData.map(r => String(r[h]).trim()).filter(v => v && v !== 'null' && v !== 'undefined');
+      if (!vals.length) return;
+      const isMulti = vals.some(v => v.includes(','));
+      const counter = {};
+      if (isMulti) vals.forEach(v => v.split(',').forEach(item => { item = item.trim(); if (item) counter[item] = (counter[item] || 0) + 1; }));
+      else vals.forEach(v => { counter[v] = (counter[v] || 0) + 1; });
+      const sorted = Object.entries(counter).sort((a, b) => b[1] - a[1]);
+      questions.push({ id: colIdx + 1, title: h, type: isMulti ? 'multi' : 'single', total: vals.length, labels: sorted.map(s => s[0]), counts: sorted.map(s => s[1]), percents: sorted.map(s => Math.round(s[1] / vals.length * 1000) / 10) });
+    });
+
+    // 切换到图表页
+    showDashboard();
+  } catch (e) {
+    alert('加载文件失败: ' + e.message);
+  }
+}
+
+// ── 文件上传到弹窗 ──────────────────────────────
+async function handleSlothFileUpload(file) {
+  const status = document.getElementById('sfilesStatus');
+  try {
+    status.style.display = 'block';
+    status.textContent = '⏳ 上传中...';
+    status.style.color = 'var(--c-green)';
+    await SlothStorage.uploadFile(file);
+    status.textContent = '✅ 上传成功';
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
+    refreshFilesList();
+  } catch (e) {
+    status.textContent = '❌ ' + (e.message || '上传失败');
+    status.style.color = 'var(--c-red)';
+  }
+}
+
+// ── 刷新弹窗文件列表 ────────────────────────────
+async function refreshFilesList() {
+  const list = document.getElementById('sfilesList');
+  try {
+    const files = await SlothStorage.listFiles();
+    if (!files.length) {
+      list.innerHTML = '<div class="sfiles-empty">暂无文件</div>';
+      return;
+    }
+    list.innerHTML = files.map(f => {
+      const icon = getSlothFileIcon(f.file_type);
+      const size = SlothStorage.formatSize(f.file_size);
+      const date = new Date(f.created_at).toLocaleDateString('zh-CN');
+      return '<div class="sfiles-item">'
+        + '<span class="sfiles-icon">' + icon + '</span>'
+        + '<div class="sfiles-info">'
+        + '<div class="sfiles-name" title="' + escapeAttr(f.file_name) + '">' + escapeHtml(f.file_name) + '</div>'
+        + '<div class="sfiles-meta">' + size + ' · ' + date + '</div>'
+        + '</div>'
+        + '<div class="sfiles-actions">'
+        + '<button class="sfiles-btn" onclick="downloadSlothFile(\'' + f.file_path + '\',\'' + escapeAttr(f.file_name) + '\')">⬇️</button>'
+        + '<button class="sfiles-btn danger" onclick="deleteSlothFile(\'' + f.id + '\',\'' + f.file_path + '\')">🗑️</button>'
+        + '</div></div>';
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="sfiles-empty" style="color:var(--c-red)">' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// ── 工具函数 ─────────────────────────────────────
+function getSlothFileIcon(type) {
+  if (!type) return '📄';
+  if (type.includes('image')) return '🖼️';
+  if (type.includes('video')) return '🎬';
+  if (type.includes('audio')) return '🎵';
+  if (type.includes('pdf')) return '📕';
+  if (type.includes('sheet') || type.includes('excel') || type.includes('csv')) return '📊';
+  if (type.includes('document') || type.includes('word')) return '📝';
+  if (type.includes('zip') || type.includes('rar')) return '📦';
+  return '📄';
+}
+
+async function downloadSlothFile(filePath, fileName) {
+  try { await SlothStorage.downloadFile(filePath, fileName); }
+  catch (e) { alert('下载失败: ' + e.message); }
+}
+
+async function deleteSlothFile(fileId, filePath) {
+  if (!confirm('确定删除此文件？')) return;
+  try { await SlothStorage.deleteFile(fileId, filePath); refreshFilesList(); }
+  catch (e) { alert('删除失败: ' + e.message); }
+}
+
+function escapeAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+</script>
 </body>
 </html>
+
+// ── 提取 Excel 元数据（车型、姓名、城市等）──────
+function extractExcelMetadata(jsonData) {
+  if (!jsonData || !jsonData.length) return {};
+  
+  const meta = {};
+  const firstRow = jsonData[0];
+  const keys = Object.keys(firstRow);
+  
+  // 常见字段映射
+  const fieldPatterns = {
+    car: ['车型', '汽车', '车辆', '品牌', '型号', 'car', 'model'],
+    name: ['姓名', '名字', '名称', '车主', '用户', 'name'],
+    city: ['城市', '地区', '所在地', '省', '市', 'city', 'region'],
+    activity: ['活动', '体验', '项目', '场景', 'activity'],
+    item: ['物品', '商品', '产品', 'item', 'product']
+  };
+  
+  // 遍历列名，匹配字段
+  keys.forEach(key => {
+    const lowerKey = key.toLowerCase();
+    Object.entries(fieldPatterns).forEach(([field, patterns]) => {
+      if (patterns.some(p => lowerKey.includes(p))) {
+        // 取前3个不重复的值
+        const values = [...new Set(jsonData.slice(0, 10).map(row => String(row[key] || '')).filter(v => v))];
+        if (values.length > 0) {
+          meta[field] = values.slice(0, 3).join('、');
+        }
+      }
+    });
+  });
+  
+  // 如果没有匹配到，用第一列作为标题
+  if (Object.keys(meta).length === 0 && keys.length > 0) {
+    const firstColValues = [...new Set(jsonData.slice(0, 5).map(row => String(row[keys[0]] || '')).filter(v => v))];
+    if (firstColValues.length > 0) {
+      meta.title = firstColValues.slice(0, 2).join('、');
+    }
+  }
+  
+  return meta;
+}
+
+// ── 生成卡片标题 ──────────────────────────────────
+function getCardTitle(metadata, fileName) {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return fileName.replace(/\.\w+$/, ''); // 去掉扩展名
+  }
+  
+  const parts = [];
+  if (metadata.car) parts.push(metadata.car);
+  if (metadata.activity) parts.push(metadata.activity);
+  if (metadata.item) parts.push(metadata.item);
+  if (metadata.title) parts.push(metadata.title);
+  
+  return parts.length > 0 ? parts.join(' · ') : fileName.replace(/\.\w+$/, '');
+}
+
+// ── 生成卡片描述 ──────────────────────────────────
+function getCardDesc(metadata) {
+  if (!metadata || Object.keys(metadata).length === 0) return '';
+  
+  const parts = [];
+  if (metadata.name) parts.push(metadata.name);
+  if (metadata.city) parts.push(metadata.city);
+  if (metadata.car && !parts.includes(metadata.car)) parts.push(metadata.car);
+  
+  return parts.length > 0 ? parts.join(' · ') : '';
+}
+
+/* ── Logo 可点击样式 ──────────────────── */
+#dashboardLogo:hover{opacity:.8}
+#dashboardLogo:active{opacity:.6}
