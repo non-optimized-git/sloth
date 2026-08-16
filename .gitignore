@@ -1,0 +1,44 @@
+# 数览 Sloth .gitignore
+
+# Supabase 配置（敏感信息）
+supabase-config.js
+.env
+.env.local
+.env.*.local
+
+# 备份文件
+index.html.backup
+*.backup
+
+# 系统文件
+.DS_Store
+.DS_Store?
+
+# 依赖目录
+node_modules/
+
+# 测试结果
+test-results/
+
+# 临时文件
+temp-intro.html
+temp-outro.html
+
+# 视频/音频文件（大文件）
+*.mp4
+*.mov
+*.mp3
+*.aiff
+
+# 主题预览（可选保留）
+theme-preview/
+
+# 日志文件
+*.log
+npm-debug.log*
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
