@@ -14,6 +14,8 @@
 survey-dashboard/
 ├── index.html              # 📊 主产品（单文件，~62KB）
 ├── CLAUDE.md               # 📖 开发指南（本文件）
+├── CHANGELOG.md            # 📝 版本更新记录
+├── SECURITY.md             # 🔐 安全指南
 ├── package.json            # 📦 npm 配置
 ├── playwright.config.js    # 🧪 测试配置
 │
@@ -57,9 +59,12 @@ survey-dashboard/
 
 ```javascript
 let rawData = [];           // Excel 原始数据
-let questions = [];         // 解析后的题目数组
-let headers = [];           // 表头库（可拖拽排序）
+let questions = [];         // 解析后的题目数组（跳过空列）
+let headers = [];           // Excel 列名数组（所有列）
 let groups = [];            // 分组配置
+let headerLibrary = [];     // 表头库
+let activeHeaderIds = new Set(); // 当前激活的表头 ID
+let hiddenQuestions = new Set(); // 被隐藏的题目索引
 let displayMode = 'percent'; // 数据格式：percent/count/both
 let decimalPlaces = 0;      // 小数位数：0/1/2
 let showDiff = false;       // 差异高亮
@@ -71,20 +76,21 @@ let currentTheme = 'light'; // 主题
 
 | 函数 | 作用 |
 |------|------|
-| `parseExcel()` | 解析 Excel，自动识别单选/多选 |
-| `computeSubset(qIdx, filterFn)` | 计算子集数据 |
-| `buildFilter(hdr)` | 构建表头过滤器 |
+| `parseExcel()` | 解析 Excel，自动识别单选/多选，过滤空列，自动隐藏高基数题目 |
+| `computeSubset(qIdx, filterFn)` | 计算子集数据（使用 `questions[qIdx].title` 作为列名） |
+| `buildFilter(hdr)` | 构建表头过滤器（使用 `questions[f.questionIdx].title` 作为列名） |
 | `renderAll()` | = `renderSidebar()` + `renderMain()` + `renderHeaderLib()` |
 | `renderCharts()` | 用 ECharts 渲染图表 |
 | `copyQuestionData(qi)` | 复制为 Markdown 表格 |
 | `openHeaderPicker()` | 打开表头选择器 |
 | `openEditHeader(idx)` | 编辑表头 |
+| `sanitizeFileName(name)` | 清理文件名，替换非 ASCII 字符为下划线 |
 
 ### ECharts 图表配置
 
 - **主题颜色**：用 `getCSS('--bar-color')` 获取（不支持 CSS 变量）
 - **动画**：从上到下加载 `animationDelay: idx => (revLabels.length-1-idx)*35`
-- **柱体**：圆角 `[0,5,5,0]`，宽度可调 `barMaxWidth`
+- **柱体**：圆角 `[0,5,5,0]`，宽度固定 `barWidth: barMaxWidth`（所有柱体粗细一致）
 - **每题独立比例尺**：不统一 xMax
 
 ## 常见修改场景
@@ -106,6 +112,29 @@ let currentTheme = 'light'; // 主题
 
 - 默认值在 JS 顶部：`displayMode='percent'`, `decimalPlaces=0`
 - HTML 默认激活状态要对应
+
+### 数据索引注意事项
+
+**重要**：`headers` 数组和 `questions` 数组索引不一致！
+- `headers`：包含 Excel 所有列名（包括空列）
+- `questions`：只包含有数据的列（跳过空列）
+
+**正确用法**：
+```javascript
+// ✅ 正确：使用 question.title 作为列名
+const colName = questions[qIdx].title;
+const value = row[colName];
+
+// ❌ 错误：使用索引访问 headers
+const value = row[headers[qIdx]]; // 可能索引错位！
+```
+
+### Supabase 集成
+
+- 配置文件：`supabase-config.js`（已在 .gitignore）
+- 认证：`supabase-auth.js`（SlothAuth 对象）
+- 存储：`supabase-storage.js`（SlothStorage 对象）
+- 文件路径：`{user_id}/{timestamp}_{filename}`
 
 ### 修改视频
 

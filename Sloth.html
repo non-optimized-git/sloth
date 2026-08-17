@@ -7,9 +7,357 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="supabase-config.js"></script>
-<script src="supabase-auth.js"></script>
-<script src="supabase-storage.js"></script>
+<script>
+/**
+ * Supabase 配置文件 — 数览 Sloth
+ * 
+ * 使用前请替换以下占位符为你的 Supabase 项目真实凭证：
+ *   - YOUR_SUPABASE_URL
+ *   - sb_publishable_hqTwaAFAFyFyyZzxr0yfeQ_hYNEbZ5T
+ * 
+ * 获取方式：Supabase Dashboard → Settings → API
+ */
+
+const SUPABASE_URL = 'https://dijrslohfqreirdrjbry.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_hqTwaAFAFyFyyZzxr0yfeQ_hYNEbZ5T';
+
+// Storage bucket 名称
+const STORAGE_BUCKET = 'sloth-files';
+
+// 文件大小限制 (20MB)
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+// 初始化 Supabase 客户端（全局）
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+<script>
+/**
+ * Supabase 认证模块 — 数览 Sloth
+ * 
+ * 提供邮箱登录/注册、OAuth 登录（Google/GitHub）、退出功能
+ * 登录为可选功能，不登录也能使用原有功能
+ */
+
+const SlothAuth = (() => {
+  let currentUser = null;
+  let onAuthChange = null;
+
+  // ── 初始化：监听认证状态 ───────────────────────
+  async function init(authChangeCallback) {
+    onAuthChange = authChangeCallback;
+
+    // 获取当前会话
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    currentUser = session?.user || null;
+    updateUI();
+    // 初始加载时也调用回调
+    if (onAuthChange) onAuthChange(currentUser);
+
+    // 监听登录/退出事件
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      currentUser = session?.user || null;
+      updateUI();
+      if (onAuthChange) onAuthChange(currentUser);
+    });
+  }
+
+  // ── 邮箱登录 ───────────────────────────────────
+  async function signInWithEmail(email, password) {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data.user;
+  }
+
+  // ── 邮箱注册 ───────────────────────────────────
+  async function signUpWithEmail(email, password) {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) throw error;
+    return data.user;
+  }
+
+  // ── OAuth 登录（Google / GitHub）──────────────
+  async function signInWithOAuth(provider) {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) throw error;
+  }
+
+  // ── 退出 ───────────────────────────────────────
+  async function signOut() {
+    console.log("[SlothAuth] 尝试退出...");
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) {
+        console.error("[SlothAuth] 退出失败:", error);
+        alert("退出失败: " + error.message);
+        throw error;
+      }
+      console.log("[SlothAuth] 退出成功");
+    } catch (e) {
+      console.error("[SlothAuth] 退出异常:", e);
+      alert("退出异常: " + e.message);
+    }
+  }
+
+  // ── 获取当前用户 ───────────────────────────────
+  function getUser() { return currentUser; }
+  function isLoggedIn() { return !!currentUser; }
+
+  // ── UI 更新 ────────────────────────────────────
+  function updateUI() {
+    const name = currentUser ? (currentUser.user_metadata?.full_name
+      || currentUser.user_metadata?.name
+      || currentUser.email?.split('@')[0]
+      || '用户') : '';
+
+    // Dashboard header 用户栏
+    const userBar = document.getElementById('slothUserBar');
+    const loginBtn = document.getElementById('slothLoginBtn');
+    const userInfo = document.getElementById('slothUserInfo');
+    const userName = document.getElementById('slothUserName');
+    if (userBar) {
+      if (currentUser) {
+        loginBtn.style.display = 'none';
+        userInfo.style.display = 'flex';
+        userName.textContent = name;
+      } else {
+        loginBtn.style.display = 'inline-flex';
+        userInfo.style.display = 'none';
+      }
+    }
+
+    // 上传页顶部栏
+    const uploadLoginBtn = document.getElementById('uploadLoginBtn');
+    const uploadUserInfo = document.getElementById('uploadUserInfo');
+    const uploadUserName = document.getElementById('uploadUserName');
+    if (uploadLoginBtn) {
+      if (currentUser) {
+        uploadLoginBtn.style.display = 'none';
+        uploadUserInfo.style.display = 'flex';
+        uploadUserName.textContent = currentUser.email || '用户';
+      } else {
+        uploadLoginBtn.style.display = 'inline-flex';
+        uploadUserInfo.style.display = 'none';
+      }
+    }
+
+    // 文件页用户名
+    const filesPageUserName = document.getElementById('filesPageUserName');
+    if (filesPageUserName && currentUser) {
+      filesPageUserName.textContent = currentUser.email || '用户';
+    }
+  }
+
+  // ── 弹窗控制 ────────────────────────────────────
+  function openLoginModal() {
+    const modal = document.getElementById('slothLoginModal');
+    if (modal) modal.classList.remove('hidden');
+    // 默认显示登录 tab
+    switchAuthTab('login');
+  }
+  function closeLoginModal() {
+    const modal = document.getElementById('slothLoginModal');
+    if (modal) modal.classList.add('hidden');
+    clearAuthError();
+  }
+
+  function switchAuthTab(tab) {
+    document.querySelectorAll('.sauth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.sauth-tab[data-tab="${tab}"]`)?.classList.add('active');
+    document.getElementById('sauthLoginForm').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('sauthSignupForm').style.display = tab === 'signup' ? 'block' : 'none';
+    clearAuthError();
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('sauthError');
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+  }
+  function clearAuthError() {
+    const el = document.getElementById('sauthError');
+    if (el) { el.textContent = ''; el.style.display = 'none'; }
+  }
+
+  // ── 绑定事件 ────────────────────────────────────
+  function bindEvents() {
+    // 打开登录弹窗
+    document.getElementById('slothLoginBtn')?.addEventListener('click', openLoginModal);
+
+    // 关闭弹窗
+    document.getElementById('sauthClose')?.addEventListener('click', closeLoginModal);
+    document.getElementById('slothLoginModal')?.addEventListener('click', e => {
+      if (e.target.id === 'slothLoginModal') closeLoginModal();
+    });
+
+    // Tab 切换
+    document.querySelectorAll('.sauth-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    });
+
+    // 邮箱登录
+    document.getElementById('sauthLoginSubmit')?.addEventListener('click', async () => {
+      const email = document.getElementById('sauthLoginEmail').value.trim();
+      const pwd = document.getElementById('sauthLoginPwd').value;
+      if (!email || !pwd) { showAuthError('请填写邮箱和密码'); return; }
+      try {
+        await signInWithEmail(email, pwd);
+        closeLoginModal();
+      } catch (e) { showAuthError(e.message || '登录失败'); }
+    });
+
+    // 邮箱注册
+    document.getElementById('sauthSignupSubmit')?.addEventListener('click', async () => {
+      const email = document.getElementById('sauthSignupEmail').value.trim();
+      const pwd = document.getElementById('sauthSignupPwd').value;
+      if (!email || !pwd) { showAuthError('请填写邮箱和密码'); return; }
+      if (pwd.length < 6) { showAuthError('密码至少 6 位'); return; }
+      try {
+        await signUpWithEmail(email, pwd);
+        showAuthError('注册成功！如需邮箱验证请查看收件箱。');
+      } catch (e) { showAuthError(e.message || '注册失败'); }
+    });
+
+    // OAuth 按钮
+    document.getElementById('sauthGoogle')?.addEventListener('click', () => signInWithOAuth('google'));
+    document.getElementById('sauthGitHub')?.addEventListener('click', () => signInWithOAuth('github'));
+
+    // 退出
+    document.getElementById('slothLogoutBtn')?.addEventListener('click', async () => {
+      await signOut();
+    });
+  }
+
+  return { init, getUser, isLoggedIn, signOut, bindEvents, openLoginModal, closeLoginModal };
+})();
+</script>
+<script>
+/**
+ * Supabase 文件管理模块 — 数览 Sloth
+ * 
+ * 功能：文件上传 / 下载 / 删除 / 列表
+ * 前提：用户已登录（SlothAuth.isLoggedIn() === true）
+ * 文件大小限制：20MB（由 supabase-config.js 定义）
+ */
+
+const SlothStorage = (() => {
+
+  // ── 文件名安全化：只保留字母数字连字符下划线句点 ──
+  function sanitizeFileName(name) {
+    // 提取扩展名
+    const lastDot = name.lastIndexOf('.');
+    const baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
+    const ext = lastDot > 0 ? name.substring(lastDot) : '';
+    // 替换不安全字符（只保留 ASCII 字母、数字、连字符、下划线）
+    const safe = baseName.replace(/[^a-zA-Z0-9\-_]/g, '_');
+    // 去除连续下划线和首尾下划线
+    const cleaned = safe.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    // 如果清理后为空，使用时间戳
+    return (cleaned || Date.now().toString()) + ext;
+  }
+
+  // ── 上传文件 ───────────────────────────────────
+  async function uploadFile(file) {
+    if (!SlothAuth.isLoggedIn()) throw new Error('请先登录');
+    if (file.size > MAX_FILE_SIZE) throw new Error(`文件大小不能超过 ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+
+    const user = SlothAuth.getUser();
+    const ext = file.name.split('.').pop();
+    const timestamp = Date.now();
+    // 存储路径：{user_id}/{timestamp}_{safe_name}
+    const safeName = sanitizeFileName(file.name);
+    const filePath = `${user.id}/${timestamp}_${safeName}`;
+
+    // 1. 上传到 Storage
+    const { error: uploadError } = await supabaseClient.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, file, { upsert: false });
+    if (uploadError) throw uploadError;
+
+    // 2. 记录元数据到 files 表
+    const { error: dbError } = await supabaseClient
+      .from('files')
+      .insert({
+        user_id: user.id,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        file_type: file.type || `application/${ext}`,
+      });
+    if (dbError) throw dbError;
+
+    return { path: filePath, name: file.name, size: file.size };
+  }
+
+  // ── 获取用户文件列表 ───────────────────────────
+  async function listFiles() {
+    if (!SlothAuth.isLoggedIn()) throw new Error('请先登录');
+
+    const { data, error } = await supabaseClient
+      .from('files')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // ── 下载文件 ───────────────────────────────────
+  async function downloadFile(filePath, fileName) {
+    if (!SlothAuth.isLoggedIn()) throw new Error('请先登录');
+
+    const { data, error } = await supabaseClient.storage
+      .from(STORAGE_BUCKET)
+      .download(filePath);
+    if (error) throw error;
+
+    // 触发浏览器下载
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || filePath.split('/').pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ── 删除文件 ───────────────────────────────────
+  async function deleteFile(fileId, filePath) {
+    if (!SlothAuth.isLoggedIn()) throw new Error('请先登录');
+
+    // 1. 从 Storage 删除
+    const { error: storageError } = await supabaseClient.storage
+      .from(STORAGE_BUCKET)
+      .remove([filePath]);
+    if (storageError) throw storageError;
+
+    // 2. 从 files 表删除
+    const { error: dbError } = await supabaseClient
+      .from('files')
+      .delete()
+      .eq('id', fileId);
+    if (dbError) throw dbError;
+  }
+
+  // ── 获取公开 URL（用于预览）────────────────────
+  function getPublicUrl(filePath) {
+    const { data } = supabaseClient.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(filePath);
+    return data?.publicUrl;
+  }
+
+  // ── 格式化文件大小 ─────────────────────────────
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  return { uploadFile, listFiles, downloadFile, deleteFile, getPublicUrl, formatSize };
+})();
+</script>
 <style>
 /* ══════════════════════════════════════
    数览 Sloth · 设计系统 v5.0

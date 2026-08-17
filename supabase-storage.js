@@ -8,6 +8,20 @@
 
 const SlothStorage = (() => {
 
+  // ── 文件名安全化：只保留字母数字连字符下划线句点 ──
+  function sanitizeFileName(name) {
+    // 提取扩展名
+    const lastDot = name.lastIndexOf('.');
+    const baseName = lastDot > 0 ? name.substring(0, lastDot) : name;
+    const ext = lastDot > 0 ? name.substring(lastDot) : '';
+    // 替换不安全字符（只保留 ASCII 字母、数字、连字符、下划线）
+    const safe = baseName.replace(/[^a-zA-Z0-9\-_]/g, '_');
+    // 去除连续下划线和首尾下划线
+    const cleaned = safe.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    // 如果清理后为空，使用时间戳
+    return (cleaned || Date.now().toString()) + ext;
+  }
+
   // ── 上传文件 ───────────────────────────────────
   async function uploadFile(file) {
     if (!SlothAuth.isLoggedIn()) throw new Error('请先登录');
@@ -16,8 +30,9 @@ const SlothStorage = (() => {
     const user = SlothAuth.getUser();
     const ext = file.name.split('.').pop();
     const timestamp = Date.now();
-    // 存储路径：{user_id}/{timestamp}_{original_name}
-    const filePath = `${user.id}/${timestamp}_${file.name}`;
+    // 存储路径：{user_id}/{timestamp}_{safe_name}
+    const safeName = sanitizeFileName(file.name);
+    const filePath = `${user.id}/${timestamp}_${safeName}`;
 
     // 1. 上传到 Storage
     const { error: uploadError } = await supabaseClient.storage
