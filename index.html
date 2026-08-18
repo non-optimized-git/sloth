@@ -92,6 +92,11 @@ body{
 .search-box input:focus{border-color:var(--c-green);box-shadow:0 0 0 2px var(--c-green-l)}
 .search-box input::placeholder{color:var(--t3)}
 
+/* 隐藏题目提示 */
+.hidden-hint{display:flex;align-items:flex-start;gap:6px;padding:6px 10px;margin:0 6px 4px;background:var(--c-amber-l);border-radius:var(--radius-s);font-size:11px;color:var(--t2);line-height:1.4}
+.hidden-hint-icon{flex-shrink:0;font-size:12px}
+.hidden-hint-text{flex:1}
+
 /* ── 顶部 Banner ──────────────────── */
 .header{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--c-card);border-bottom:1px solid var(--c-border);height:52px;display:flex;align-items:center;padding:0 16px;transition:background-color .4s ease,border-color .4s ease}
 .header .logo{font-size:var(--f-lg);font-weight:700;color:var(--c-brown);display:flex;align-items:center;gap:4px}
@@ -198,8 +203,8 @@ body{
 .toggle-row .tl{font-size:var(--f-sm);color:var(--t3);font-weight:500}
 .toggle{width:36px;height:20px;background:var(--c-border);border-radius:12px;position:relative;transition:background .2s,background-color .4s ease}
 .toggle .knob{width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.toggle-row.on .toggle{background:var(--c-green)}
-.toggle-row.on .toggle .knob{transform:translateX(16px)}
+.toggle-row.on .toggle,.toggle.on{background:var(--c-green)}
+.toggle-row.on .toggle .knob,.toggle.on .knob{transform:translateX(16px)}
 
 /* ── 表头库 ────────────────────────── */
 .header-lib{flex:1;overflow-y:auto;padding:5px 10px}
@@ -270,6 +275,23 @@ body{
 .complex-group-item .remove-ci{cursor:pointer;opacity:.3;font-size:12px}
 .complex-group-item .remove-ci:hover{opacity:1}
 .complex-group-actions{margin-top:4px;display:flex;gap:3px}
+
+/* 加权选项行 */
+.weight-opt-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:var(--f-sm)}
+.weight-opt-label{flex:1;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.weight-opt-pct{color:var(--t3);font-size:11px;min-width:36px;text-align:right}
+.weight-opt-input{width:60px;padding:4px 6px;text-align:center;border:1px solid var(--c-border);border-radius:var(--radius-s);background:var(--c-card);color:var(--t1);font-size:var(--f-sm)}
+.weight-opt-input:focus{border-color:var(--c-green);outline:none}
+
+/* Toast 通知 */
+.toast-container{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{padding:10px 18px;background:var(--c-card);border:1px solid var(--c-border);border-radius:var(--radius-m);box-shadow:0 4px 12px rgba(0,0,0,.08);font-size:var(--f-sm);color:var(--t1);opacity:0;transform:translateY(-10px);animation:toastIn .3s ease forwards;pointer-events:auto;display:flex;align-items:center;gap:8px;max-width:400px}
+.toast.info{border-left:3px solid var(--c-green)}
+.toast.warn{border-left:3px solid var(--c-amber)}
+.toast .toast-icon{font-size:16px}
+.toast.hiding{animation:toastOut .3s ease forwards}
+@keyframes toastIn{to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-10px)}}
 
 /* 暗色模式微调 */
 [data-theme="dark"] .upload-area:hover{background:var(--c-green-l);border-color:var(--c-green)}
@@ -561,6 +583,10 @@ body{
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="🔍 搜索题目..." autocomplete="off">
       </div>
+      <div class="hidden-hint" id="hiddenHint" style="display:none">
+        <span class="hidden-hint-icon">ℹ️</span>
+        <span class="hidden-hint-text"></span>
+      </div>
       <div class="add-group-btn" id="addGroupBtn">＋ 添加分组</div>
     </nav>
     <div class="sidebar-resizer" id="sidebarResizer"></div>
@@ -589,6 +615,30 @@ body{
       <div style="display:flex;align-items:center;gap:6px">
         <input type="range" id="barWidthRange" min="8" max="28" value="16" style="flex:1;accent-color:var(--c-green);height:6px">
         <span id="barWidthLabel" style="font-size:var(--f-sm);color:var(--t3);min-width:20px;text-align:right">16</span>
+      </div>
+    </div>
+    <div class="tb-section" id="weightSection">
+      <div class="tb-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>⚖️ 加权分析</span>
+        <div class="toggle" id="weightToggle"><div class="knob"></div></div>
+      </div>
+      <div id="weightPanel" style="display:none">
+        <div class="tb-label">加权题目</div>
+        <select id="weightQDropdown" style="width:100%;padding:6px;border:1px solid var(--c-border);border-radius:var(--radius-m);background:var(--c-card);color:var(--t1);font-size:var(--f-sm)">
+          <option value="-1">请选择...</option>
+        </select>
+        <div id="weightBtnsPanel" style="display:none;margin-top:10px">
+          <div class="tb-label">操作</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn sm" id="downloadWeightTpl">下载当前比例</button>
+            <button class="btn sm" id="uploadWeightBtn">上传新比例</button>
+          </div>
+          <input type="file" id="weightFileInput" accept=".xlsx,.xls" style="display:none">
+        </div>
+        <div id="weightStatusPanel" style="display:none;margin-top:10px">
+          <div class="tb-label">状态</div>
+          <div id="weightStatus" style="font-size:var(--f-sm);color:var(--t3)"></div>
+        </div>
       </div>
     </div>
     <div class="tb-section" style="flex:1;display:flex;flex-direction:column;min-height:0">
@@ -672,6 +722,13 @@ let chartInstances=[], groups=[], groupIdCounter=0;
 let currentTheme='light', barMaxWidth=16;
 let hiddenQuestions = new Set(); // 被隐藏的题目索引
 
+// 加权配置
+let weightConfig = {
+  enabled: false,           // 是否启用加权
+  questionIdx: -1,          // 加权题目索引
+  weights: {}               // 权重映射 { "选项名": 权重比例 }
+};
+
 // 表头库：[{id, name, filters:[{questionIdx,optionLabel}], baseCount}]
 let headerLibrary=[];
 let headerIdCounter=0;
@@ -689,7 +746,7 @@ function autoSave(){
   if(autoSaveTimer)clearTimeout(autoSaveTimer);
   autoSaveTimer=setTimeout(()=>{
     try{
-      const config={version:5,groups,headerLibrary,headerIdCounter,activeHeaderIds:[...activeHeaderIds],displayMode,decimalPlaces,showDiff,barMaxWidth,currentTheme};
+      const config={version:6,groups,headerLibrary,headerIdCounter,activeHeaderIds:[...activeHeaderIds],displayMode,decimalPlaces,showDiff,barMaxWidth,currentTheme,weightConfig};
       localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(config));
     }catch(e){console.warn('自动保存失败:',e)}
   },500); // 500ms 防抖
@@ -700,12 +757,13 @@ function loadAutoSave(){
     const saved=localStorage.getItem(AUTOSAVE_KEY);
     if(!saved)return false;
     const config=JSON.parse(saved);
-    if(config.version!==5)return false;
+    if(config.version!==5&&config.version!==6)return false;
     groups=config.groups||[];groupIdCounter=groups.length?Math.max(...groups.map(g=>g.id))+1:0;
     headerLibrary=config.headerLibrary||[];headerIdCounter=config.headerIdCounter||0;
     activeHeaderIds=new Set(config.activeHeaderIds||[]);
     displayMode=config.displayMode||'percent';decimalPlaces=config.decimalPlaces??1;showDiff=config.showDiff||false;
     barMaxWidth=config.barMaxWidth||16;currentTheme=config.currentTheme||'light';
+    weightConfig=config.weightConfig||{enabled:false,questionIdx:-1,weights:{}};
     // 恢复 UI
     document.querySelectorAll('#modeOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.mode===displayMode));
     document.querySelectorAll('#decimalOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.decimal==decimalPlaces));
@@ -714,6 +772,9 @@ function loadAutoSave(){
     document.getElementById('barWidthLabel').textContent=barMaxWidth;
     document.documentElement.setAttribute('data-theme',currentTheme);
     document.getElementById('themeToggle').textContent=currentTheme==='dark'?'☀️':'🌙';
+    // 恢复加权 UI
+    document.getElementById('weightToggle').classList.toggle('on',weightConfig.enabled);
+    document.getElementById('weightPanel').style.display=weightConfig.enabled?'block':'none';
     return true;
   }catch(e){return false}
 }
@@ -792,14 +853,14 @@ function parseExcel(file){
           hiddenQuestions.add(questions.length-1);
         }
       });
-      // 提示用户有题目被自动隐藏
-      if(hiddenQuestions.size > 0){
-        const hiddenTitles = [...hiddenQuestions].map(i=>questions[i].title).slice(0,3);
-        const msg = hiddenQuestions.size === 1
-          ? `已自动隐藏高基数题目：${hiddenTitles[0]}`
-          : `已自动隐藏 ${hiddenQuestions.size} 道高基数题目（如：${hiddenTitles.join('、')}）`;
-        setTimeout(()=>alert(msg + '\n\n可在左侧导航中手动勾选显示'), 500);
-      }
+      // 记录隐藏题目数量（提示在 showDashboard 中显示）
+      const hiddenCount = hiddenQuestions.size;
+      // 重置加权配置
+      weightConfig={enabled:false,questionIdx:-1,weights:{}};
+      document.getElementById('weightToggle').classList.remove('on');
+      document.getElementById('weightPanel').style.display='none';
+      initWeightDropdown();
+      updateWeightUI();
       showDashboard();
     }catch(err){alert('解析失败：'+err.message);console.error(err)}
   };
@@ -814,6 +875,20 @@ function showDashboard(){
   document.getElementById('sidebarResizer').style.left=getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
   headerLibrary=[];headerIdCounter=0;activeHeaderIds=new Set();
   groups=[];groupIdCounter=0;
+  // 显示隐藏题目提示
+  const hiddenHint=document.getElementById('hiddenHint');
+  if(hiddenQuestions.size>0){
+    hiddenHint.style.display='flex';
+    hiddenHint.querySelector('.hidden-hint-text').textContent=hiddenQuestions.size+' 道高基数题目已隐藏，勾选显示';
+  }else{
+    hiddenHint.style.display='none';
+  }
+  // 恢复加权下拉框状态
+  initWeightDropdown();
+  if(weightConfig.questionIdx>=0){
+    document.getElementById('weightQDropdown').value=weightConfig.questionIdx;
+  }
+  updateWeightUI();
   renderAll();
   slothPulse();
 }
@@ -824,14 +899,30 @@ function computeSubset(qIdx,filterFn){
   const filtered=rawData.filter(filterFn),total=filtered.length;
   if(!total)return null;
   const isMulti=q.type==='multi',counter={};
+  let weightedTotal=0;
+
+  // 获取加权题目信息
+  const wEnabled=weightConfig.enabled&&weightConfig.questionIdx>=0;
+  const wQ=wEnabled?questions[weightConfig.questionIdx]:null;
+
   filtered.forEach(row=>{
+    // 计算该行的权重
+    let weight=1;
+    if(wEnabled&&wQ){
+      const wValue=String(row[wQ.title]).trim();
+      weight=weightConfig.weights[wValue]??1;
+    }
+
     const v=String(row[h]).trim();
     if(!v||v==='null'||v==='undefined')return;
-    if(isMulti) v.split(',').forEach(item=>{item=item.trim();if(item)counter[item]=(counter[item]||0)+1});
-    else counter[v]=(counter[v]||0)+1;
+    if(isMulti) v.split(',').forEach(item=>{item=item.trim();if(item)counter[item]=(counter[item]||0)+weight});
+    else counter[v]=(counter[v]||0)+weight;
+    weightedTotal+=weight;
   });
-  const counts=q.labels.map(l=>counter[l]||0),percents=counts.map(c=>Math.round(c/total*1000)/10);
-  return{total,counts,percents};
+  const effectiveTotal=wEnabled?weightedTotal:total;
+  const counts=q.labels.map(l=>Math.round((counter[l]||0)*100)/100);
+  const percents=counts.map(c=>Math.round(c/effectiveTotal*1000)/10);
+  return{total:Math.round(effectiveTotal),counts,percents};
 }
 function buildFilter(hdr){
   return row=>hdr.filters.some(f=>{
@@ -851,8 +942,10 @@ function renderSidebar(){
   const sb=document.getElementById('sidebar');
   const addBtn=document.getElementById('addGroupBtn');
   const searchBox=document.querySelector('.search-box');
+  const hiddenHint=document.getElementById('hiddenHint');
   sb.innerHTML='';
   if(searchBox)sb.appendChild(searchBox);
+  if(hiddenHint)sb.appendChild(hiddenHint);
   sb.appendChild(addBtn);
   // 创建可滚动的目录容器
   let navList=document.getElementById('navList');
@@ -1028,8 +1121,11 @@ function renderCharts(){
     // 跳过被隐藏的题目
     if(hiddenQuestions.has(i)) return;
     const revLabels=q.labels.slice().reverse();
+    // Total 列也需要应用加权
+    const totalSubset=computeSubset(i,()=>true);
+    const totalData=totalSubset||{counts:q.counts,percents:q.percents,total:q.total};
     const allCols=[
-      {name:'Total',data:q.counts,percents:q.percents,total:q.total},
+      {name:'Total',data:totalData.counts,percents:totalData.percents,total:totalData.total},
       ...ah.map(hdr=>{
         const subset=computeSubset(i,buildFilter(hdr));
         return subset?{name:hdr.name,data:subset.counts,percents:subset.percents,total:subset.total}
@@ -1076,7 +1172,8 @@ function renderCharts(){
           textStyle:{color:getCSS('--t1')||'#3c3228',fontSize:12},
           formatter:function(params){
             const p=params[0],idx=q.labels.length-1-p.dataIndex;
-            return '<b>'+q.labels[idx]+'</b><br/>'+col.name+' (n='+col.total+')：'+fmtPct(col.percents[idx])+' ('+col.data[idx]+'人)';
+            const wTag=weightConfig.enabled?' [加权]':'';
+            return '<b>'+q.labels[idx]+'</b><br/>'+col.name+' (n='+col.total+')'+wTag+'：'+fmtPct(col.percents[idx])+' ('+col.data[idx]+')';
           },confine:true
         },
         grid:{left:3,right:50,top:2,bottom:3,containLabel:true},
@@ -1362,9 +1459,134 @@ document.getElementById('barWidthRange').addEventListener('input',function(){
   renderCharts();
 });
 
+// ── 加权分析 ──────────────────────────────────────
+// 加权开关
+document.getElementById('weightToggle').addEventListener('click',function(){
+  weightConfig.enabled=!weightConfig.enabled;
+  this.classList.toggle('on',weightConfig.enabled);
+  document.getElementById('weightPanel').style.display=weightConfig.enabled?'block':'none';
+  renderCharts();
+});
+
+// 加权题目下拉框
+document.getElementById('weightQDropdown').addEventListener('change',function(){
+  const newIdx=parseInt(this.value);
+  // 如果已有权重数据，弹窗确认
+  if(weightConfig.questionIdx>=0&&Object.keys(weightConfig.weights).length>0){
+    showConfirm('切换加权题目','切换加权题目将清除已设置的权重数据，确定继续？',()=>{
+      weightConfig.questionIdx=newIdx;
+      weightConfig.weights={};
+      updateWeightUI();
+      renderCharts();
+    });
+    // 恢复下拉框原值
+    this.value=weightConfig.questionIdx;
+    return;
+  }
+  weightConfig.questionIdx=newIdx;
+  weightConfig.weights={};
+  updateWeightUI();
+  renderCharts();
+});
+
+// 更新加权UI状态
+function updateWeightUI(){
+  const qIdx=weightConfig.questionIdx;
+  const btnsPanel=document.getElementById('weightBtnsPanel');
+  const statusPanel=document.getElementById('weightStatusPanel');
+  if(qIdx<0){
+    btnsPanel.style.display='none';
+    statusPanel.style.display='none';
+    return;
+  }
+  btnsPanel.style.display='block';
+  // 检查是否有权重数据
+  if(Object.keys(weightConfig.weights).length>0){
+    statusPanel.style.display='block';
+    document.getElementById('weightStatus').textContent='已加载 '+Object.keys(weightConfig.weights).length+' 项权重';
+  }else{
+    statusPanel.style.display='none';
+  }
+}
+
+// 下载权重模板
+document.getElementById('downloadWeightTpl').addEventListener('click',function(){
+  const qIdx=weightConfig.questionIdx;
+  if(qIdx<0){showToast('请先选择加权题目','warn');return}
+  const q=questions[qIdx];
+  // 构建Excel数据
+  const data=[['选项','当前比例(%)','加权后比例(%)']];
+  q.labels.forEach((label,i)=>{
+    data.push([label,q.percents[i],'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'权重配置');
+  XLSX.writeFile(wb,'加权模板-'+q.title+'.xlsx');
+  showToast('模板已下载','info');
+});
+
+// 上传权重文件
+document.getElementById('uploadWeightBtn').addEventListener('click',function(){
+  document.getElementById('weightFileInput').click();
+});
+
+document.getElementById('weightFileInput').addEventListener('change',function(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onerror=function(){showToast('文件读取失败','warn')};
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{header:1});
+      if(data.length<2){showToast('文件无数据','warn');return}
+      // 解析目标比例，计算权重 = 目标比例 / 当前比例
+      const weights={};
+      const qIdx=weightConfig.questionIdx;
+      if(qIdx<0){showToast('请先选择加权题目','warn');return}
+      const q=questions[qIdx];
+      for(let i=1;i<data.length;i++){
+        const row=data[i];
+        if(row[0]&&row[2]!==undefined&&row[2]!==''){
+          const label=String(row[0]).trim();
+          const targetPct=parseFloat(row[2]); // 用户输入的目标比例
+          const currentPct=parseFloat(row[1]); // 当前比例
+          if(!isNaN(targetPct)&&targetPct>0&&!isNaN(currentPct)&&currentPct>0){
+            // 权重 = 目标比例 / 当前比例
+            weights[label]=targetPct/currentPct;
+          }
+        }
+      }
+      if(Object.keys(weights).length===0){showToast('未找到有效权重数据','warn');return}
+      weightConfig.weights=weights;
+      // 自动启用加权
+      if(!weightConfig.enabled){
+        weightConfig.enabled=true;
+        document.getElementById('weightToggle').classList.add('on');
+      }
+      updateWeightUI();
+      renderCharts();
+      showToast('已加载 '+Object.keys(weights).length+' 项权重','info');
+    }catch(err){showToast('文件解析失败：'+err.message,'warn')}
+  };
+  reader.readAsArrayBuffer(file);
+  this.value=''; // 重置input
+});
+
+// 初始化加权题目下拉框
+function initWeightDropdown(){
+  const dropdown=document.getElementById('weightQDropdown');
+  dropdown.innerHTML='<option value="-1">请选择...</option>';
+  questions.forEach((q,i)=>{
+    dropdown.innerHTML+=`<option value="${i}">${escapeHtml(q.title)}</option>`;
+  });
+}
+
 // ── 导出/导入配置 ─────────────────────────────────
 document.getElementById('exportBtn').addEventListener('click',()=>{
-  const config={version:5,groups,headerLibrary,headerIdCounter,activeHeaderIds:[...activeHeaderIds],displayMode,decimalPlaces,showDiff,barMaxWidth,currentTheme};
+  const config={version:6,groups,headerLibrary,headerIdCounter,activeHeaderIds:[...activeHeaderIds],displayMode,decimalPlaces,showDiff,barMaxWidth,currentTheme,weightConfig};
   const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sloth-config.json';a.click();
   slothPulse();
@@ -1373,16 +1595,17 @@ document.getElementById('importBtn').addEventListener('click',()=>document.getEl
 document.getElementById('configFileInput').addEventListener('change',e=>{
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onerror=function(){alert('配置文件读取失败')};
+  reader.onerror=function(){showToast('配置文件读取失败','warn')};
   reader.onload=function(ev){
     try{
       const config=JSON.parse(ev.target.result);
-      if(config.version!==4&&config.version!==5){alert('配置版本不兼容');return}
+      if(config.version!==4&&config.version!==5&&config.version!==6){showToast('配置版本不兼容','warn');return}
       groups=config.groups||[];groupIdCounter=groups.length?Math.max(...groups.map(g=>g.id))+1:0;
       headerLibrary=config.headerLibrary||[];headerIdCounter=config.headerIdCounter||0;
       activeHeaderIds=new Set(config.activeHeaderIds||[]);
       displayMode=config.displayMode||'percent';decimalPlaces=config.decimalPlaces??1;showDiff=config.showDiff||false;
       barMaxWidth=config.barMaxWidth||16;currentTheme=config.currentTheme||'light';
+      weightConfig=config.weightConfig||{enabled:false,questionIdx:-1,weights:{}};
       // 恢复 UI
       document.querySelectorAll('#modeOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.mode===displayMode));
       document.querySelectorAll('#decimalOptions .seg').forEach(o=>o.classList.toggle('active',o.dataset.decimal==decimalPlaces));
@@ -1391,8 +1614,19 @@ document.getElementById('configFileInput').addEventListener('change',e=>{
       document.getElementById('barWidthLabel').textContent=barMaxWidth;
       document.documentElement.setAttribute('data-theme',currentTheme);
       document.getElementById('themeToggle').textContent=currentTheme==='dark'?'☀️':'🌙';
+      // 恢复加权 UI
+      document.getElementById('weightToggle').classList.toggle('on',weightConfig.enabled);
+      document.getElementById('weightPanel').style.display=weightConfig.enabled?'block':'none';
+      if(questions.length>0){
+        initWeightDropdown();
+        if(weightConfig.questionIdx>=0){
+          document.getElementById('weightQDropdown').value=weightConfig.questionIdx;
+        }
+      }
+      updateWeightUI();
       renderAll();
-    }catch(err){alert('配置解析失败：'+err.message)}
+      showToast('配置已导入','info');
+    }catch(err){showToast('配置解析失败：'+err.message,'warn')}
   };
   reader.readAsText(file);
 });
@@ -1925,6 +2159,18 @@ async function deleteSlothFile(fileId, filePath) {
 
 function escapeAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// ── Toast 通知 ─────────────────────────────────────
+function showToast(msg,type='info',duration=3000){
+  const container=document.getElementById('toastContainer');
+  const toast=document.createElement('div');
+  toast.className='toast '+type;
+  const icon=type==='warn'?'⚠️':'ℹ️';
+  toast.innerHTML=`<span class="toast-icon">${icon}</span><span>${escapeHtml(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(()=>{toast.classList.add('hiding');setTimeout(()=>toast.remove(),300)},duration);
+}
+
 </script>
+<div class="toast-container" id="toastContainer"></div>
 </body>
 </html>
